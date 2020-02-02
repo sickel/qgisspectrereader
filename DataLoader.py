@@ -195,9 +195,10 @@ class DataLoader:
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = DataLoaderDialog()
+            self.dlg = DataLoaderDialog(parent=self.iface.mainWindow())
             self.dlg.pbLoadData.clicked.connect(self.selectfile)
             self.dlg.pbNewLayer.clicked.connect(self.createlayer)
+            self.dlg.pbClose.clicked.connect(self.closedlg)
             self.dlg.cbMapLayer.setFilters(QgsMapLayerProxyModel.PointLayer)
             self.dlg.cbMapLayer.setShowCrs(True)
             
@@ -211,6 +212,9 @@ class DataLoader:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
             pass
+        
+    def closedlg(self):
+        self.dlg.hide()
 
     def selectfile(self):
         print(self.dlg.FileWidget.filePath())
