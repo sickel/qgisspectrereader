@@ -225,9 +225,27 @@ class DataLoader:
         return(','.join(alist))
 
     def selectfile(self):
-        mission=self.dlg.leMission.text()
-        vl=self.dlg.cbMapLayer.currentLayer()
-        pr = vl.dataProvider()
+        self.mission=self.dlg.leMission.text()
+        self.vl=self.dlg.cbMapLayer.currentLayer()
+        self.pr = self.vl.dataProvider()
+        self.filename=self.dlg.FileWidget.filePath()
+        self.database="MEM"
+        fromCRS=QgsCoordinateReferenceSystem("EPSG:4326")
+        toCRS= self.vl.crs()
+        print(fromCRS)
+        print(toCRS)
+        self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
+        try:
+            self.readRSI()
+            self.iface.mapCanvas().refreshAllLayers()
+            self.dlg.leMission.clear()
+            self.dlg.FileWidget.setFilePath("")
+            self.iface.messageBar().pushMessage("Data Loader", "File imported sucessfully to '{}'".format(self.vl.name()), level=Qgis.Success)
+        except:
+            self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Error)
+            
+            
+    def readRSI(self):
         fs={'lat':9,
             'lon':8,
             'gpsalt':10,
@@ -241,19 +259,9 @@ class DataLoader:
             'line':11}
         fs['alt']=fs['laseralt']
         #TODO: User selectable field mapping
-        filename=self.dlg.FileWidget.filePath()
-        database="MEM"
-        print(filename)
         header=True
         idxs=[]
-        
-        fromCRS=QgsCoordinateReferenceSystem("EPSG:4326")
-        toCRS= QgsProject.instance().crs()
-        print(fromCRS)
-        print(toCRS)
-        transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
-
-        with open(filename, "r",encoding='latin-1') as f:
+        with open(self.filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
                 if(header):
@@ -265,29 +273,27 @@ class DataLoader:
                         idxs=get_indexes("Spectrum VD",data)
                     header = idx<2
                 else:
-                    if database=="PG":
+                    if self.database=="PG":
                         vd1=lst2pgarr(data[idxs[0]:idxs[0]+1024])
                         vd2=lst2pgarr(data[idxs[1]:idxs[1]+1024])
                     else:
                         vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
                         vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
-                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],filename,mission]
-                    insdata=[x if x !='' else None for x in insdata]
-                    fet = QgsFeature()
-                    point=QgsPointXY(float(data[fs['lon']]),float(data[fs['lat']]))
-                    prpoint=transformation.transform(point)
-                    geom=QgsGeometry.fromPointXY(prpoint)
-                    
-                    fet.setGeometry(geom )
-                    fet.setAttributes(insdata)
-                    pr.addFeatures( [ fet ] )
+                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],self.filename,self.mission]
+                    self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
                     # print(insdata)
                 #cur.execute(insert,insdata)
-        self.dlg.leMission.clear()
-        self.dlg.FileWidget.setFilePath("")
-        self.iface.messageBar().pushMessage("Data Loader", "File imported sucessfully to '{}'".format(vl.name()), level=Qgis.Success)
         
-        
+    def insertpoint(self,lat,lon,insdata):
+        fet = QgsFeature()
+        point=QgsPointXY(float(lon),float(lat))
+        prpoint=self.transformation.transform(point)
+        geom=QgsGeometry.fromPointXY(prpoint)
+        fet.setGeometry(geom)
+        insdata=[x if x !='' else None for x in insdata]
+        fet.setAttributes(insdata)
+        self.pr.addFeatures( [ fet ] )
+                    
         
 
     def createlayer(self):
