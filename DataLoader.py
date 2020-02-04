@@ -31,7 +31,7 @@ from .resources import *
 from .DataLoader_dialog import DataLoaderDialog
 import os.path
 
-from qgis.core import QgsVectorLayer, QgsFeature, QgsField, QgsGeometry, QgsPointXY, QgsField, QgsProject, QgsMapLayerProxyModel
+from qgis.core import QgsVectorLayer, QgsFeature, QgsField, QgsGeometry, QgsPointXY, QgsField, QgsProject, QgsMapLayerProxyModel, QgsCoordinateTransform, QgsCoordinateReferenceSystem
 
 from qgis.core import Qgis
 
@@ -247,6 +247,12 @@ class DataLoader:
         header=True
         idxs=[]
         
+        fromCRS=QgsCoordinateReferenceSystem("EPSG:4326")
+        toCRS= QgsProject.instance().crs()
+        print(fromCRS)
+        print(toCRS)
+        transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
+
         with open(filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
@@ -262,16 +268,19 @@ class DataLoader:
                     if database=="PG":
                         vd1=lst2pgarr(data[idxs[0]:idxs[0]+1024])
                         vd2=lst2pgarr(data[idxs[1]:idxs[1]+1024])
-                        insdata=[data[9],data[8],data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[23],data[22],data[21],data[11],filename]
                     else:
                         vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
                         vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
-                        insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],filename,mission]
-                        insdata=[x if x !='' else None for x in insdata]
-                        fet = QgsFeature()
-                        fet.setGeometry( QgsGeometry.fromPointXY(QgsPointXY(float(data[fs['lon']]),float(data[fs['lat']]))))
-                        fet.setAttributes(insdata)
-                        pr.addFeatures( [ fet ] )
+                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],filename,mission]
+                    insdata=[x if x !='' else None for x in insdata]
+                    fet = QgsFeature()
+                    point=QgsPointXY(float(data[fs['lon']]),float(data[fs['lat']]))
+                    prpoint=transformation.transform(point)
+                    geom=QgsGeometry.fromPointXY(prpoint)
+                    
+                    fet.setGeometry(geom )
+                    fet.setAttributes(insdata)
+                    pr.addFeatures( [ fet ] )
                     # print(insdata)
                 #cur.execute(insert,insdata)
         self.dlg.leMission.clear()
@@ -286,7 +295,8 @@ class DataLoader:
         mission=self.dlg.leMission.text()
         if mission > '':
             layername="{} ({})".format(layername,mission)
-        vl = QgsVectorLayer("Point", layername, "memory")
+        CRS= QgsProject.instance().crs()
+        vl = QgsVectorLayer("Point", layername, "memory",crs=CRS)
         pr = vl.dataProvider()
         # Enter editing mode
         vl.startEditing()
