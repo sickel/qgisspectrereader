@@ -33,6 +33,8 @@ import os.path
 
 from qgis.core import QgsVectorLayer, QgsFeature, QgsField, QgsGeometry, QgsPointXY, QgsField, QgsProject, QgsMapLayerProxyModel
 
+from qgis.core import Qgis
+
 from qgis.gui import QgsFileWidget
 
 from PyQt5.QtCore import *
@@ -223,6 +225,7 @@ class DataLoader:
         return(','.join(alist))
 
     def selectfile(self):
+        mission=self.dlg.leMission.text()
         vl=self.dlg.cbMapLayer.currentLayer()
         pr = vl.dataProvider()
         fs={'lat':9,
@@ -241,42 +244,49 @@ class DataLoader:
         filename=self.dlg.FileWidget.filePath()
         database="MEM"
         print(filename)
-        f = open(filename, "r",encoding='latin-1')
         header=True
         idxs=[]
-        for idx,line in enumerate(f):
-            data=(line.split(',')) 
-            if(header):
-                if idx ==1:
-                # print(data)
-                    matching = [s for s in data if "Spectrum VD" in s]
-                    print(matching)
-                    get_indexes = lambda x, xs: [i for (y, i) in zip(xs, range(len(xs))) if x in y]
-                    idxs=get_indexes("Spectrum VD",data)
-                header = idx<2
-            else:
-                if database=="PG":
-                    vd1=lst2pgarr(data[idxs[0]:idxs[0]+1024])
-                    vd2=lst2pgarr(data[idxs[1]:idxs[1]+1024])
-                    insdata=[data[9],data[8],data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[23],data[22],data[21],data[11],filename]
+        
+        with open(filename, "r",encoding='latin-1') as f:
+            for idx,line in enumerate(f):
+                data=(line.split(',')) 
+                if(header):
+                    if idx ==1:
+                    # print(data)
+                        matching = [s for s in data if "Spectrum VD" in s]
+                        print(matching)
+                        get_indexes = lambda x, xs: [i for (y, i) in zip(xs, range(len(xs))) if x in y]
+                        idxs=get_indexes("Spectrum VD",data)
+                    header = idx<2
                 else:
-                    vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
-                    vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
-                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],filename]
-                    insdata=[x if x !='' else None for x in insdata]
-                    fet = QgsFeature()
-                    fet.setGeometry( QgsGeometry.fromPointXY(QgsPointXY(float(data[fs['lon']]),float(data[fs['lat']]))))
-                    fet.setAttributes(insdata)
-                    pr.addFeatures( [ fet ] )
-                # print(insdata)
+                    if database=="PG":
+                        vd1=lst2pgarr(data[idxs[0]:idxs[0]+1024])
+                        vd2=lst2pgarr(data[idxs[1]:idxs[1]+1024])
+                        insdata=[data[9],data[8],data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[23],data[22],data[21],data[11],filename]
+                    else:
+                        vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
+                        vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
+                        insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],filename,mission]
+                        insdata=[x if x !='' else None for x in insdata]
+                        fet = QgsFeature()
+                        fet.setGeometry( QgsGeometry.fromPointXY(QgsPointXY(float(data[fs['lon']]),float(data[fs['lat']]))))
+                        fet.setAttributes(insdata)
+                        pr.addFeatures( [ fet ] )
+                    # print(insdata)
                 #cur.execute(insert,insdata)
-    
+        self.dlg.leMission.clear()
+        self.dlg.FileWidget.setFilePath("")
+        self.iface.messageBar().pushMessage("Data Loader", "File imported sucessfully to '{}'".format(vl.name()), level=Qgis.Success)
         
         
         
 
     def createlayer(self):
-        vl = QgsVectorLayer("Point", "Spectral data", "memory")
+        layername="Spectral data"
+        mission=self.dlg.leMission.text()
+        if mission > '':
+            layername="{} ({})".format(layername,mission)
+        vl = QgsVectorLayer("Point", layername, "memory")
         pr = vl.dataProvider()
         # Enter editing mode
         vl.startEditing()
@@ -293,7 +303,8 @@ class DataLoader:
                         QgsField("pressure", QVariant.Double),
                         QgsField("temperature", QVariant.Double),
                         QgsField("linenumber", QVariant.Int),
-                        QgsField("filename", QVariant.String)] )
+                        QgsField("filename", QVariant.String),
+                        QgsField("mission", QVariant.String)] )
 
         # Commit changes
         vl.commitChanges()
