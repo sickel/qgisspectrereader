@@ -219,10 +219,13 @@ class DataLoader:
         self.dlg.hide()
 
     def lst2pgarr(self,alist):
-        return('{' + lst2arr(alist) + '}')
+        return()
 
     def lst2arr(self,alist):
-        return(','.join(alist))
+        ret=','.join(alist)
+        if self.database=="PG":
+            ret='{' + ret + '}'
+        return(ret|)
 
     def selectfile(self):
         self.mission=self.dlg.leMission.text()
@@ -231,12 +234,15 @@ class DataLoader:
         self.filename=self.dlg.FileWidget.filePath()
         self.database="MEM"
         fromCRS=QgsCoordinateReferenceSystem("EPSG:4326")
+        #TODO: User selectable source CRS
         toCRS= self.vl.crs()
         print(fromCRS)
         print(toCRS)
         self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
         try:
+            #TODO: Other file reading functions - eg. based on file name
             self.readRSI()
+            # Refreshes canvas and clears dialog to make it clear that the data have been imported
             self.iface.mapCanvas().refreshAllLayers()
             self.dlg.leMission.clear()
             self.dlg.FileWidget.setFilePath("")
@@ -265,25 +271,21 @@ class DataLoader:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
                 if(header):
+                    # RSI export CSV has a two line header. Need to fetch some information from it to be able to 
+                    # read the spectre in a sensible way
                     if idx ==1:
-                    # print(data)
                         matching = [s for s in data if "Spectrum VD" in s]
                         print(matching)
                         get_indexes = lambda x, xs: [i for (y, i) in zip(xs, range(len(xs))) if x in y]
                         idxs=get_indexes("Spectrum VD",data)
                     header = idx<2
                 else:
-                    if self.database=="PG":
-                        vd1=lst2pgarr(data[idxs[0]:idxs[0]+1024])
-                        vd2=lst2pgarr(data[idxs[1]:idxs[1]+1024])
-                    else:
-                        vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
-                        vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
+                    vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
+                    vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
+                    # TODO: Make a timestamp from the epoch number
                     insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],self.filename,self.mission]
                     self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
-                    # print(insdata)
-                #cur.execute(insert,insdata)
-        
+                
     def insertpoint(self,lat,lon,insdata):
         fet = QgsFeature()
         point=QgsPointXY(float(lon),float(lat))
@@ -294,18 +296,20 @@ class DataLoader:
         fet.setAttributes(insdata)
         self.pr.addFeatures( [ fet ] )
                     
-        
 
     def createlayer(self):
         layername="Spectral data"
         mission=self.dlg.leMission.text()
         if mission > '':
             layername="{} ({})".format(layername,mission)
+        # Uses the project to set a crs for the layer|
+        # TODO: Show a reminder if project == EPSG3246, that this may not be what one wants
         CRS= QgsProject.instance().crs()
         vl = QgsVectorLayer("Point", layername, "memory",crs=CRS)
         pr = vl.dataProvider()
         # Enter editing mode
         vl.startEditing()
+        # is this needed?
         # add fields
         # 
         #latitude,longitude,altitude,acqtime,flightdosevd1,flightdosevd2,specvd1,specvd2,laseralt,radalt,pressure,temperature,linenumber,filename
@@ -322,7 +326,9 @@ class DataLoader:
                         QgsField("filename", QVariant.String),
                         QgsField("mission", QVariant.String)] )
 
-        # Commit changes
+        # Commit changes - is this needed?
         vl.commitChanges()
+        # To display the new layer in the project
         QgsProject.instance().addMapLayer(vl)
+        # Default layer to import data into
         self.dlg.cbMapLayer.setLayer(vl)
