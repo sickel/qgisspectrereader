@@ -216,8 +216,64 @@ class DataLoader:
     def closedlg(self):
         self.dlg.hide()
 
+    def lst2pgarr(self,alist):
+        return('{' + lst2arr(alist) + '}')
+
+    def lst2arr(self,alist):
+        return(','.join(alist))
+
     def selectfile(self):
-        print(self.dlg.FileWidget.filePath())
+        vl=self.dlg.cbMapLayer.currentLayer()
+        pr = vl.dataProvider()
+        fs={'lat':9,
+            'lon':8,
+            'gpsalt':10,
+            'acqtime':1,
+            'dose1':14,
+            'dose2':28,
+            'laseralt':24,
+            'radaralt':23,
+            'press':22,
+            'temp':21,
+            'line':11}
+        fs['alt']=fs['laseralt']
+        #TODO: User selectable field mapping
+        filename=self.dlg.FileWidget.filePath()
+        database="MEM"
+        print(filename)
+        f = open(filename, "r",encoding='latin-1')
+        header=True
+        idxs=[]
+        for idx,line in enumerate(f):
+            data=(line.split(',')) 
+            if(header):
+                if idx ==1:
+                # print(data)
+                    matching = [s for s in data if "Spectrum VD" in s]
+                    print(matching)
+                    get_indexes = lambda x, xs: [i for (y, i) in zip(xs, range(len(xs))) if x in y]
+                    idxs=get_indexes("Spectrum VD",data)
+                header = idx<2
+            else:
+                if database=="PG":
+                    vd1=lst2pgarr(data[idxs[0]:idxs[0]+1024])
+                    vd2=lst2pgarr(data[idxs[1]:idxs[1]+1024])
+                    insdata=[data[9],data[8],data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[23],data[22],data[21],data[11],filename]
+                else:
+                    vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
+                    vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
+                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],filename]
+                    insdata=[x if x !='' else None for x in insdata]
+                    fet = QgsFeature()
+                    fet.setGeometry( QgsGeometry.fromPointXY(QgsPointXY(float(data[fs['lon']]),float(data[fs['lat']]))))
+                    fet.setAttributes(insdata)
+                    pr.addFeatures( [ fet ] )
+                # print(insdata)
+                #cur.execute(insert,insdata)
+    
+        
+        
+        
 
     def createlayer(self):
         vl = QgsVectorLayer("Point", "Spectral data", "memory")
@@ -226,6 +282,7 @@ class DataLoader:
         vl.startEditing()
         # add fields
         # 
+        #latitude,longitude,altitude,acqtime,flightdosevd1,flightdosevd2,specvd1,specvd2,laseralt,radalt,pressure,temperature,linenumber,filename
         pr.addAttributes( [ QgsField("gpsaltitude", QVariant.Double),
                         QgsField("acqtime",  QVariant.String),
                         QgsField("dose1", QVariant.Double),
