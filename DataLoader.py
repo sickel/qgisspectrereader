@@ -40,6 +40,8 @@ from qgis.gui import QgsFileWidget
 from PyQt5.QtCore import *
 #from PyQt.QtGui import QFileDialog
 
+class unknownFileType(Exception):
+    pass
 
 
 class DataLoader:
@@ -218,14 +220,14 @@ class DataLoader:
     def closedlg(self):
         self.dlg.hide()
 
-    def lst2pgarr(self,alist):
-        return()
-
+    
     def lst2arr(self,alist):
+        """ Makes a comma separated string. If postgres is used, the string is formatted to be inserted as
+        a native array"""
         ret=','.join(alist)
         if self.database=="PG":
             ret='{' + ret + '}'
-        return(ret|)
+        return(ret)
 
     def selectfile(self):
         self.mission=self.dlg.leMission.text()
@@ -241,16 +243,64 @@ class DataLoader:
         self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
         try:
             #TODO: Other file reading functions - eg. based on file name
-            self.readRSI()
+            if self.filename.endswith('.csv'):
+                self.readRSI()
+            elif self.filename.endswith('.spe'):
+                self.readspe()
+            else:
+                raise unknownFileType()
             # Refreshes canvas and clears dialog to make it clear that the data have been imported
             self.iface.mapCanvas().refreshAllLayers()
             self.dlg.leMission.clear()
             self.dlg.FileWidget.setFilePath("")
             self.iface.messageBar().pushMessage("Data Loader", "File imported sucessfully to '{}'".format(self.vl.name()), level=Qgis.Success)
-        except:
-            self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Error)
+        except Exception as e:
+            print(e)
+            self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Critical)
             
-            
+    
+    def readspe(self):
+        directory=os.path.split(self.filename)[0]
+        files=os.listdir(directory)
+        spefiles=list(filter(lambda x: x.endswith('.spe'), files))
+        spefiles.sort()
+        print(spefiles)
+        readspec=False
+        readGPS=False
+        
+        for filename in spefiles:
+            spectre=[]
+            gpsdata=dict()
+            with open(directory+'/'+filename, "r",encoding='latin-1') as f:
+                for line in f:
+                    if readspec:
+                        if not line.startswith('$'):
+                            spectre.append(line.strip())
+                            continue
+                        else:
+                            readspec=False
+                            spectre=self.lst2arr(spectre)
+                    if readGPS:
+                        if not line.startswith('$'):
+                            parts=line.split('=')
+                            gpsdata[parts[0]]=parts[1].strip()
+                            continue
+                    readGPS=line.startswith('$GPS:')
+                    if line.startswith('$DATE_MEA:'):
+                        date=f.readline()
+                        continue
+                    if line.startswith('$DATA'):
+                        readspec=True
+                        nlines=f.readline().split()[1].strip()
+                    if line.startswith('$DOSE_RATE:'):
+                        dose=f.readline().strip()
+                    if line.startswith('$TEMPERATURE:'):
+                        temperature=f.readline().strip()
+            insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '', self.filename, self.mission]
+            self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata)
+                        
+        
+    
     def readRSI(self):
         fs={'lat':9,
             'lon':8,
