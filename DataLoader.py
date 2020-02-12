@@ -200,6 +200,7 @@ class DataLoader:
         if self.first_start == True:
             self.first_start = False
             self.dlg = DataLoaderDialog(parent=self.iface.mainWindow())
+            # This makes the dialog modal
             self.dlg.pbLoadData.clicked.connect(self.selectfile)
             self.dlg.pbNewLayer.clicked.connect(self.createlayer)
             self.dlg.pbClose.clicked.connect(self.closedlg)
@@ -230,13 +231,48 @@ class DataLoader:
         return(ret)
 
     def selectfile(self):
+                        
+        """
+        Selects and stores data from a file or set of files
+        
+        
+        To write a parser for another file format: The parser should read the file or files to be imported, then populate an array with the following data:
+        
+        altitude floating point number (above sea level, e.g. gps altitude) - 
+        sampling time string (any format, but it should preferably be consistent)
+        dose for detector 1 floating point number
+        dose for detector 2 floating point number
+        spectre for detector 1 string consiting of a comma separated list of integers 
+        spectre for detector 2 string consiting of a comma separated list of integers
+        height above ground floating point number
+        height measurement 2 floating point number (these two may be laser and radar altitude from a flown detector
+        pressure floating point number
+        temperature floating point number
+        line number integer e.g. to show when the measurements should be used
+        filename string
+        mission  string
+        
+        For each datapoint, call self.insertpoint(lat,lon, array)
+        
+        lat and lon is assumed to be be in WGS84. The point will be reprojected to whatever CRS is used in the layer it is being stored
+        
+        """
+    
+        
         self.mission=self.dlg.leMission.text()
         self.vl=self.dlg.cbMapLayer.currentLayer()
+        layer=self.iface.activeLayer()
+        idx=layer.fields().indexFromName('id')
+        self.maxid=max(0,layer.maximumValue(idx))
+        print(max(self.maxid))
         self.pr = self.vl.dataProvider()
         self.filename=self.dlg.FileWidget.filePath()
         self.database="MEM"
+        self.autoid=False
+        # May be set to PG to use postgresql's native array storage 
         fromCRS=QgsCoordinateReferenceSystem("EPSG:4326")
-        #TODO: User selectable source CRS
+        # The coordinate system the data to be imported are stored in
+        #TODO: User selectable source CRS 
         toCRS= self.vl.crs()
         print(fromCRS)
         print(toCRS)
@@ -244,9 +280,9 @@ class DataLoader:
         try:
             #TODO: Other file reading functions - eg. based on file name
             if self.filename.endswith('.csv'):
-                self.readRSI()
+                self.readRSI(self.filename)
             elif self.filename.endswith('.spe'):
-                self.readspe()
+                self.readspe(self.filename)
             else:
                 raise unknownFileType()
             # Refreshes canvas and clears dialog to make it clear that the data have been imported
@@ -259,8 +295,12 @@ class DataLoader:
             self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Critical)
             
     
-    def readspe(self):
-        directory=os.path.split(self.filename)[0]
+    def readspe(self,filename):
+        """
+        Reads a directory with spe-files
+        Select one file within the directory - all will be read
+        """
+        directory=os.path.split(filename)[0]
         files=os.listdir(directory)
         spefiles=list(filter(lambda x: x.endswith('.spe'), files))
         spefiles.sort()
@@ -298,10 +338,14 @@ class DataLoader:
                         temperature=f.readline().strip()
             insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '', self.filename, self.mission]
             self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata)
-                        
-        
-    
-    def readRSI(self):
+          
+          
+    def readRSI(self,filename):
+        """
+        Reads a csv file exported from RSI's radassist. The file has a two line header.
+        It is assumed 1024ch spectra
+        """
+        chnum=1024
         fs={'lat':9,
             'lon':8,
             'gpsalt':10,
@@ -330,24 +374,50 @@ class DataLoader:
                         idxs=get_indexes("Spectrum VD",data)
                     header = idx<2
                 else:
-                    vd1=self.lst2arr(data[idxs[0]:idxs[0]+1024])
-                    vd2=self.lst2arr(data[idxs[1]:idxs[1]+1024])
+                    vd1=self.lst2arr(data[idxs[0]:idxs[0]+chnum])
+                    vd2=self.lst2arr(data[idxs[1]:idxs[1]+chnum])
                     # TODO: Make a timestamp from the epoch number
-                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],self.filename,self.mission]
-                    self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
+                    try:
+                        insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],self.filename,self.mission]
+                        self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
+                    except Exception as e:
+                        print(e)
                 
     def insertpoint(self,lat,lon,insdata):
+        """
+        Inserts a newly defined point into the selected layer
+        """
+        floats=[0,2,3,6,7,8,9]
+            for f in floats:
+                if insdata[f] == '':
+                    insdata|[f]==None
+                else:
+                    insdata[f]=float(insdata[f])
+            ints=[10]
+            for i in ints:
+                if insdata[i] == '':
+                    insdata[i]==None
+                else:
+                    insdata[i]=int(insdata[i])
+                
+        
         fet = QgsFeature()
         point=QgsPointXY(float(lon),float(lat))
         prpoint=self.transformation.transform(point)
         geom=QgsGeometry.fromPointXY(prpoint)
         fet.setGeometry(geom)
+        self.maxid+=1
+        insdata.insert(0,self.maxid)
         insdata=[x if x !='' else None for x in insdata]
         fet.setAttributes(insdata)
         self.pr.addFeatures( [ fet ] )
                     
 
     def createlayer(self):
+        """
+        Creates a new layer designed for storage of imported data
+        
+        """
         layername="Spectral data"
         mission=self.dlg.leMission.text()
         if mission > '':
@@ -361,9 +431,9 @@ class DataLoader:
         vl.startEditing()
         # is this needed?
         # add fields
-        # 
-        #latitude,longitude,altitude,acqtime,flightdosevd1,flightdosevd2,specvd1,specvd2,laseralt,radalt,pressure,temperature,linenumber,filename
-        pr.addAttributes( [ QgsField("gpsaltitude", QVariant.Double),
+        pr.addAttributes( [
+                        QgsField("id",QVariant.Int),
+                        QgsField("gpsaltitude", QVariant.Double),
                         QgsField("acqtime",  QVariant.String),
                         QgsField("dose1", QVariant.Double),
                         QgsField("dose2", QVariant.Double),
@@ -380,5 +450,5 @@ class DataLoader:
         vl.commitChanges()
         # To display the new layer in the project
         QgsProject.instance().addMapLayer(vl)
-        # Default layer to import data into
+        # Set the new layer as the default layer to import data into
         self.dlg.cbMapLayer.setLayer(vl)
