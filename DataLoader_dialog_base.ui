@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>399</width>
-    <height>203</height>
+    <width>419</width>
+    <height>259</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,7 +17,7 @@
    <property name="geometry">
     <rect>
      <x>300</x>
-     <y>160</y>
+     <y>200</y>
      <width>88</width>
      <height>34</height>
     </rect>
@@ -29,8 +29,8 @@
   <widget class="QPushButton" name="pbNewLayer">
    <property name="geometry">
     <rect>
-     <x>120</x>
-     <y>160</y>
+     <x>30</x>
+     <y>60</y>
      <width>88</width>
      <height>34</height>
     </rect>
@@ -42,8 +42,8 @@
   <widget class="QPushButton" name="pbLoadData">
    <property name="geometry">
     <rect>
-     <x>20</x>
-     <y>160</y>
+     <x>30</x>
+     <y>200</y>
      <width>88</width>
      <height>34</height>
     </rect>
@@ -56,7 +56,7 @@
    <property name="geometry">
     <rect>
      <x>180</x>
-     <y>30</y>
+     <y>100</y>
      <width>201</width>
      <height>32</height>
     </rect>
@@ -66,7 +66,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>40</y>
+     <y>110</y>
      <width>151</width>
      <height>18</height>
     </rect>
@@ -79,17 +79,20 @@
    <property name="geometry">
     <rect>
      <x>180</x>
-     <y>70</y>
+     <y>150</y>
      <width>201</width>
      <height>34</height>
     </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::TabFocus</enum>
    </property>
   </widget>
   <widget class="QLabel" name="label_2">
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>80</y>
+     <y>160</y>
      <width>151</width>
      <height>18</height>
     </rect>
@@ -102,7 +105,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>120</y>
+     <y>30</y>
      <width>151</width>
      <height>18</height>
     </rect>
@@ -115,7 +118,7 @@
    <property name="geometry">
     <rect>
      <x>180</x>
-     <y>110</y>
+     <y>20</y>
      <width>201</width>
      <height>32</height>
     </rect>
@@ -134,6 +137,14 @@
    <header>qgsmaplayercombobox.h</header>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>leMission</tabstop>
+  <tabstop>pbNewLayer</tabstop>
+  <tabstop>cbMapLayer</tabstop>
+  <tabstop>FileWidget</tabstop>
+  <tabstop>pbLoadData</tabstop>
+  <tabstop>pbClose</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

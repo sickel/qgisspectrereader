@@ -236,22 +236,25 @@ class DataLoader:
         Selects and stores data from a file or set of files
         
         
-        To write a parser for another file format: The parser should read the file or files to be imported, then populate an array with the following data:
+        To write a parser for another file format: The parser should read the file or files to be imported, 
+        then for each measurementpopulate an array with the following data:
         
-        altitude floating point number (above sea level, e.g. gps altitude) - 
-        sampling time string (any format, but it should preferably be consistent)
-        dose for detector 1 floating point number
-        dose for detector 2 floating point number
-        spectre for detector 1 string consiting of a comma separated list of integers 
-        spectre for detector 2 string consiting of a comma separated list of integers
-        height above ground floating point number
-        height measurement 2 floating point number (these two may be laser and radar altitude from a flown detector
-        pressure floating point number
-        temperature floating point number
-        line number integer e.g. to show when the measurements should be used
-        filename string
-        mission  string
+        altitude, floating point number (above sea level, e.g. gps altitude) - 
+        sampling time, string (any format, but it should preferably be consistent)
+        dose for detector 1, floating point number
+        dose for detector 2, floating point number
+        spectre for detector 1, string consiting of a comma separated list of integers 
+        spectre for detector 2, string consiting of a comma separated list of integers
+        height above ground, floating point number
+        pressure, floating point number
+        temperature, floating point number
+        line number, integer e.g. to show when the measurements should be used
+
+        The values can all be strings in the call to insertpoints, but they need to be parseable as the above mentioned
+        data types.
         
+        Unknown data kan be represented by an empty string or None. These will both be stored as NULL.
+
         For each datapoint, call self.insertpoint(lat,lon, array)
         
         lat and lon is assumed to be be in WGS84. The point will be reprojected to whatever CRS is used in the layer it is being stored
@@ -264,7 +267,7 @@ class DataLoader:
         layer=self.iface.activeLayer()
         idx=layer.fields().indexFromName('id')
         self.maxid=max(0,layer.maximumValue(idx))
-        print(max(self.maxid))
+        print(self.maxid)
         self.pr = self.vl.dataProvider()
         self.filename=self.dlg.FileWidget.filePath()
         self.database="MEM"
@@ -278,6 +281,8 @@ class DataLoader:
         print(toCRS)
         self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
         try:
+            self.read=0
+            self.readfailure=0
             #TODO: Other file reading functions - eg. based on file name
             if self.filename.endswith('.csv'):
                 self.readRSI(self.filename)
@@ -289,7 +294,13 @@ class DataLoader:
             self.iface.mapCanvas().refreshAllLayers()
             self.dlg.leMission.clear()
             self.dlg.FileWidget.setFilePath("")
-            self.iface.messageBar().pushMessage("Data Loader", "File imported sucessfully to '{}'".format(self.vl.name()), level=Qgis.Success)
+            if self.readfailure==0:
+                message="{} points from file imported sucessfully to '{}'".format(self.read,self.vl.name())
+                level=Qgis.Success   
+            else:
+                message="Problem reading {} points - ({} read successfully)".format(self.readfailure,self.read)
+                level=Qgis.Warning
+            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
         except Exception as e:
             print(e)
             self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Critical)
@@ -336,7 +347,7 @@ class DataLoader:
                         dose=f.readline().strip()
                     if line.startswith('$TEMPERATURE:'):
                         temperature=f.readline().strip()
-            insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '', self.filename, self.mission]
+            insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '']
             self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata)
           
           
@@ -377,41 +388,45 @@ class DataLoader:
                     vd1=self.lst2arr(data[idxs[0]:idxs[0]+chnum])
                     vd2=self.lst2arr(data[idxs[1]:idxs[1]+chnum])
                     # TODO: Make a timestamp from the epoch number
-                    try:
-                        insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11],self.filename,self.mission]
-                        self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
-                    except Exception as e:
-                        print(e)
+                    
+                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11]]
+                    self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
                 
     def insertpoint(self,lat,lon,insdata):
         """
         Inserts a newly defined point into the selected layer
         """
-        floats=[0,2,3,6,7,8,9]
+        try:
+            floats=[0,2,3,6,7,8]
             for f in floats:
-                if insdata[f] == '':
-                    insdata|[f]==None
+                if insdata[f] == '' or insdata[f]==None:
+                    insdata[f]==None
                 else:
                     insdata[f]=float(insdata[f])
-            ints=[10]
+            ints=[9]
             for i in ints:
-                if insdata[i] == '':
+                if insdata[i] == '' or insdata[f]==None:
                     insdata[i]==None
                 else:
                     insdata[i]=int(insdata[i])
                 
-        
-        fet = QgsFeature()
-        point=QgsPointXY(float(lon),float(lat))
-        prpoint=self.transformation.transform(point)
-        geom=QgsGeometry.fromPointXY(prpoint)
-        fet.setGeometry(geom)
-        self.maxid+=1
-        insdata.insert(0,self.maxid)
-        insdata=[x if x !='' else None for x in insdata]
-        fet.setAttributes(insdata)
-        self.pr.addFeatures( [ fet ] )
-                    
+            insdata.append(self.filename)
+            insdata.append(self.mission)
+            
+            fet = QgsFeature()
+            point=QgsPointXY(float(lon),float(lat))
+            prpoint=self.transformation.transform(point)
+            geom=QgsGeometry.fromPointXY(prpoint)
+            fet.setGeometry(geom)
+            self.maxid+=1
+            insdata.insert(0,self.maxid)
+            insdata=[x if x !='' else None for x in insdata]
+            fet.setAttributes(insdata)
+            self.pr.addFeatures( [ fet ] )
+            self.read+=1
+        except Exception as e:
+            self.readfailure+=1
+            print(e)
 
     def createlayer(self):
         """
@@ -422,7 +437,7 @@ class DataLoader:
         mission=self.dlg.leMission.text()
         if mission > '':
             layername="{} ({})".format(layername,mission)
-        # Uses the project to set a crs for the layer|
+        # Uses the project to set a crs for the layer
         # TODO: Show a reminder if project == EPSG3246, that this may not be what one wants
         CRS= QgsProject.instance().crs()
         vl = QgsVectorLayer("Point", layername, "memory",crs=CRS)
