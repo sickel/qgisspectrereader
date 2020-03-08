@@ -39,6 +39,7 @@ from qgis.gui import QgsFileWidget
 
 from PyQt5.QtCore import *
 #from PyQt.QtGui import QFileDialog
+from qgis.core import QgsExpression
 
 class unknownFileType(Exception):
     pass
@@ -181,16 +182,19 @@ class DataLoader:
 
         # will be set False in run()
         self.first_start = True
-
+        from .lowportion import lowportion
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
+#            self.iface.removePluginVectorMenu(
+#                self.tr(u'Load spectral data'),
+#                action)
             self.iface.removePluginVectorMenu(
-                self.tr(u'&Spectral data loader'),
+                self.tr(u'Spectral data'),
                 action)
             self.iface.removeToolBarIcon(action)
-
+        QgsExpression.unregisterFunction("$lowportion")
 
     def run(self):
         """Run method that performs all the real work"""
