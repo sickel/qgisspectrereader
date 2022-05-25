@@ -305,11 +305,32 @@ class DataLoader:
                 message="Problem reading {} points - ({} read successfully)".format(self.readfailure,self.read)
                 level=Qgis.Warning
             self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+        except unknownFileType as e:
+            self.iface.messageBar().pushMessage("Data Loader", "Unknown file type '{}'".format(self.filename), level=Qgis.Critical)
         except Exception as e:
             print(e)
             self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Critical)
-            
+            raise(e)
     
+    def checkencoding(self,filename):
+        with open(filename, "rb") as file:
+            beginning = file.read(4)
+            # The order of these if-statements is important
+            # otherwise UTF32 LE may be detected as UTF16 LE as well
+            if beginning == b'\x00\x00\xfe\xff':
+                encoding="utf-32 be"
+            elif beginning == b'\xff\xfe\x00\x00':
+                encoding="utf-32 le"
+            elif beginning[0:3] == b'\xef\xbb\xbf':
+                encoding="utf-8"
+            elif beginning[0:2] == b'\xff\xfe':
+                encoding="utf-16"
+            elif beginning[0:2] == b'\xfe\xff':
+                encoding="uft-16 be"
+            else:
+                encoding=None
+        return(encoding)
+        
     def readspe(self,filename):
         """
         Reads a directory with spe-files
@@ -326,7 +347,15 @@ class DataLoader:
         for filename in spefiles:
             spectre=[]
             gpsdata=dict()
-            with open(directory+'/'+filename, "r",encoding='latin-1') as f:
+            dose = 0
+            temperature = 0
+            encoding = self.checkencoding(directory+'/'+filename)
+            #encoding = 'utf-16'
+            if encoding is None:
+                encoding = 'latin-1'
+            print(encoding)
+            with open(directory+'/'+filename, "r",encoding=encoding) as f:
+                print(f"reading {filename}")
                 for line in f:
                     if readspec:
                         if not line.startswith('$'):
@@ -336,25 +365,33 @@ class DataLoader:
                             readspec=False
                             spectre=self.lst2arr(spectre)
                     if readGPS:
+                        # print('Reading GPS')
                         if not line.startswith('$'):
                             parts=line.split('=')
                             gpsdata[parts[0]]=parts[1].strip()
                             continue
-                    readGPS=line.startswith('$GPS:')
+                    readGPS = line.startswith('$GPS:')
                     if line.startswith('$DATE_MEA:'):
                         date=f.readline()
                         continue
                     if line.startswith('$DATA'):
                         readspec=True
-                        nlines=f.readline().split()[1].strip()
+                        #print(line)
+                        nlines=f.readline()
+                        #print(nlines)
+                        nlines=nlines.split()[1].strip()
                     if line.startswith('$DOSE_RATE:'):
                         dose=f.readline().strip()
                     if line.startswith('$TEMPERATURE:'):
                         temperature=f.readline().strip()
-            insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '']
-            self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata)
-          
-          
+            try:
+                insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '']
+                #print(f"insdata;{insdata}")
+                self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata)
+                print(f'{filename} OK')
+            except:
+                print(f'No valid data found in {filename}!')
+            
     def readRSI(self,filename):
         """
         Reads a csv file exported from RSI's radassist. The file has a two line header.
@@ -394,19 +431,21 @@ class DataLoader:
                     # TODO: Make a timestamp from the epoch number
                     
                     insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11]]
+                    #print(insdata)
                     self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
                 
     def insertpoint(self,lat,lon,insdata):
         """
         Inserts a newly defined point into the selected layer
         """
+        # print(insdata)
         try:
             floats=[0,2,3,6,7,8]
             for f in floats:
-                if insdata[f] == '' or insdata[f]==None:
-                    insdata[f]==None
+                if insdata[f] == '' or insdata[f] is None:
+                    insdata[f] = None
                 else:
-                    insdata[f]=float(insdata[f])
+                    insdata[f] = float(insdata[f])
             ints=[9]
             for i in ints:
                 if insdata[i] == '' or insdata[f]==None:
