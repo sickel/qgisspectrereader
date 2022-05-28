@@ -1,0 +1,8 @@
+*.zip
+*.pyc
+help/build
+*autosave
+*.kate-swp
+test/postgis.sql
+test/testdata.gpkg
+zip_build/*
