@@ -210,9 +210,11 @@ class DataLoader:
             self.dlg.pbClose.clicked.connect(self.closedlg)
             self.dlg.cbMapLayer.setFilters(QgsMapLayerProxyModel.PointLayer)
             self.dlg.cbMapLayer.setShowCrs(True)
-            self.dlg.pbLoadData.setEnabled(False)
             self.dlg.cbMapLayer.currentIndexChanged.connect(self.enablesave)
+            
         # show the dialog
+        if self.dlg.cbMapLayer.currentLayer() == None:
+            self.dlg.pbLoadData.setEnabled(False)
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
