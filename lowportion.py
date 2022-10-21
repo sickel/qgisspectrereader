@@ -59,3 +59,43 @@ def extractchannels(arrayfield, fromch, toch, feature, parent):
     spec = list(map(float, spec)) # Converts in case
     extract = sum(spec[fromch:toch])
     return extract
+
+
+
+
+@qgsfunction(args='auto', group='Gamma')
+def extractpeak(arrayfield, fromch, toch, borderch, feature, parent):
+    """
+    <h2>Description</h2>
+    Extracts a peak above background from a spectre
+    
+    extract=sum(spectre[fromch:toch])
+    
+    fromch needs to be less than toch
+    
+    Since the last channel is used in RSI spectre to store the cosmic count, this channel 
+    is removed from the spectra before calculation. 
+    
+    Borderch is the number of channels on each side of the peak used to calculate the background, typically 5.
+    
+    <h2>Example usage:</h2>
+    <ul>
+      <li>extractchs(field,fromch,toch,borderch) -> integer</li>
+    </ul>
+    
+    """
+    spec=arrayfield
+    if isinstance(spec, str):
+        spec=spec.split(',')
+    del spec[-1] # Cosmic in RSI-spectre
+    spec = list(map(float, spec)) # Converts in case
+    leftside = sum(spec[fromch-borderch:fromch])/borderch
+    rightside = sum(spec[toch:toch+borderch])/borderch
+    peakwidth = toch - fromch
+    deltach = (leftside - rightside) / peakwidth
+    peak = spec[fromch:toch]
+    for i in range(0,peakwidth):
+        peak[i] = peak[i]*deltach*i+1
+    return sum(peak)
+
+
