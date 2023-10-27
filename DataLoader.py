@@ -101,12 +101,12 @@ class DataLoader:
         icon_path,
         text,
         callback,
-        enabled_flag=True,
-        add_to_menu=True,
-        add_to_toolbar=True,
-        status_tip=None,
-        whats_this=None,
-        parent=None):
+        enabled_flag = True,
+        add_to_menu = True,
+        add_to_toolbar = True,
+        status_tip = None,
+        whats_this = None,
+        parent = None):
         """Add a toolbar icon to the toolbar.
 
         :param icon_path: Path to the icon for this action. Can be a resource
@@ -249,20 +249,21 @@ class DataLoader:
         dose for detector 2, floating point number
         spectre for detector 1, string consiting of a comma separated list of integers 
         spectre for detector 2, string consiting of a comma separated list of integers
-        height above ground, floating point number
+        height above ground, fl oating point number, e.g. radar or laster altitude
         pressure, floating point number
         temperature, floating point number
-        line number, integer e.g. to show when the measurements should be used
+        line number, integer e.g. line number in a flight pattern
 
         The values can all be strings in the call to insertpoints, but they need to be parseable as the above mentioned
         data types.
         
         Unknown data kan be represented by an empty string or None. These will both be stored as NULL.
 
-        For each datapoint, call self.insertpoint(lat,lon, array)
+        For each datapoint, call self.insertpoint(lat,lon, array,[filename])
         
         lat and lon is assumed to be be in WGS84. The point will be reprojected to whatever CRS is used in the layer it is being stored
         
+        The filename is by default the selected filename. For data types where each spectre is stored in a separate file, the filename for each file can be given.
         """
     
         
@@ -271,23 +272,27 @@ class DataLoader:
         layer=self.iface.activeLayer()
         idx=layer.fields().indexFromName('id')
         self.maxid=max(0,layer.maximumValue(idx))
-        print(self.maxid)
+        # print(self.maxid)
         self.pr = self.vl.dataProvider()
         self.filename=self.dlg.FileWidget.filePath()
         self.database="MEM"
-        self.autoid=False
         # May be set to PG to use postgresql's native array storage 
+        self.autoid=False
         fromCRS=QgsCoordinateReferenceSystem("EPSG:4326")
         # The coordinate system the data to be imported are stored in
         #TODO: User selectable source CRS 
+        # Is it possible with a dropdown with known CRSs?
+        # or to call QGIS CRS selection dialog?
         toCRS= self.vl.crs()
-        print(fromCRS)
-        print(toCRS)
+        # print(fromCRS)
+        # print(toCRS)
         self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
         try:
             self.read=0
             self.readfailure=0
             #TODO: Other file reading functions - eg. based on file name
+            # TODO: Hourglass cursor while reading data.
+            # Progressbar?
             if self.filename.endswith('.csv'):
                 self.readRSI(self.filename)
             elif self.filename.endswith('.spe'):
@@ -309,7 +314,7 @@ class DataLoader:
             self.iface.messageBar().pushMessage("Data Loader", "Unknown file type '{}'".format(self.filename), level=Qgis.Critical)
         except Exception as e:
             print(e)
-            self.iface.messageBar().pushMessage("Data Loader", "Problem when importing '{}'".format(self.filename), level=Qgis.Critical)
+            self.iface.messageBar().pushMessage("Data Loader", f"Problem when importing '{self.filename}'", level=Qgis.Critical)
             raise(e)
     
     def checkencoding(self,filename):
@@ -340,7 +345,7 @@ class DataLoader:
         files=os.listdir(directory)
         spefiles=list(filter(lambda x: x.endswith('.spe'), files))
         spefiles.sort()
-        print(spefiles)
+        # print(spefiles)
         readspec=False
         readGPS=False
         
@@ -353,9 +358,9 @@ class DataLoader:
             #encoding = 'utf-16'
             if encoding is None:
                 encoding = 'latin-1'
-            print(encoding)
+            # print(encoding)
             with open(directory+'/'+filename, "r",encoding=encoding) as f:
-                print(f"reading {filename}")
+                # print(f"reading {filename}")
                 for line in f:
                     if readspec:
                         if not line.startswith('$'):
@@ -387,8 +392,8 @@ class DataLoader:
             try:
                 insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '']
                 #print(f"insdata;{insdata}")
-                self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata)
-                print(f'{filename} OK')
+                self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
+                # print(f'{filename} OK')
             except:
                 print(f'No valid data found in {filename}!')
             
@@ -419,26 +424,38 @@ class DataLoader:
                 if(header):
                     # RSI export CSV has a two line header. Need to fetch some information from it to be able to 
                     # read the spectre in a sensible way
-                    if idx ==1:
+                    if idx == 0:
+                        print(f'First line: {data}')
+                    if idx == 1:
                         matching = [s for s in data if "Spectrum VD" in s]
-                        print(matching)
+                        print(f'Found spectrum VDs:{matching}')
                         get_indexes = lambda x, xs: [i for (y, i) in zip(xs, range(len(xs))) if x in y]
                         idxs=get_indexes("Spectrum VD",data)
+                    if idx == 2:
+                        fs['lat'] = data.index('Lat')
+                        fs['lon'] = data.index('Long')
+                        fs['gpsalt'] = data.index('Alt[m]')
+                        print(f'fs:{fs}')
                     header = idx<2
                 else:
                     vd1=self.lst2arr(data[idxs[0]:idxs[0]+chnum])
                     vd2=self.lst2arr(data[idxs[1]:idxs[1]+chnum])
                     # TODO: Make a timestamp from the epoch number
                     
-                    insdata=[data[10],data[1],data[14],data[28],vd1,vd2,data[24],data[22],data[21],data[11]]
+                    insdata=[data[fs['gpsalt']], data[fs['acqtime']], data[fs['dose1']], data[fs['dose2']],vd1, vd2, data[fs['laseralt']], data[fs['press']], data[fs['temp']], data[fs['line']]]
                     #print(insdata)
                     self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
                 
-    def insertpoint(self,lat,lon,insdata):
+    def insertpoint(self,lat,lon,insdata,filename = None):
         """
-        Inserts a newly defined point into the selected layer
+        Inserts a newly defined point into the selected layer. 
+        
+        Filename may be set for data types where each spectrum is in a separate file.
         """
         # print(insdata)
+        if filename is None:
+            filename = self.filename
+        # print(filename)
         try:
             floats=[0,2,3,6,7,8]
             for f in floats:
@@ -448,12 +465,12 @@ class DataLoader:
                     insdata[f] = float(insdata[f])
             ints=[9]
             for i in ints:
-                if insdata[i] == '' or insdata[f]==None:
-                    insdata[i]==None
+                if insdata[i] == '' or insdata[f] is None:
+                    insdata[i] = None
                 else:
-                    insdata[i]=int(insdata[i])
+                    insdata[i] = int(insdata[i])
                 
-            insdata.append(self.filename)
+            insdata.append(filename)
             insdata.append(self.mission)
             
             fet = QgsFeature()
