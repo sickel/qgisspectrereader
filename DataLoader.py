@@ -212,9 +212,11 @@ class DataLoader:
             self.dlg.pbClose.clicked.connect(self.closedlg)
             self.dlg.cbMapLayer.setFilters(QgsMapLayerProxyModel.PointLayer)
             self.dlg.cbMapLayer.setShowCrs(True)
-            
+            self.dlg.cbMapLayer.currentIndexChanged.connect(self.enablesave)
             
         # show the dialog
+        if self.dlg.cbMapLayer.currentLayer() == None:
+            self.dlg.pbLoadData.setEnabled(False)
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
@@ -224,6 +226,9 @@ class DataLoader:
             # substitute with your code.
             pass
         
+    def enablesave(self):
+        self.dlg.pbLoadData.setEnabled(True)
+            
     def closedlg(self):
         self.dlg.hide()
 
@@ -243,7 +248,7 @@ class DataLoader:
         
         
         To write a parser for another file format: The parser should read the file or files to be imported, 
-        then for each measurementpopulate an array with the following data:
+        then for each measurement populate an array with the following data:
         
         altitude, floating point number (above sea level, e.g. gps altitude) - 
         sampling time, string (any format, but it should preferably be consistent)
@@ -263,9 +268,13 @@ class DataLoader:
 
         For each datapoint, call self.insertpoint(lat,lon, array,[filename])
         
-        lat and lon is assumed to be be in WGS84. The point will be reprojected to whatever CRS is used in the layer it is being stored
+        lat and lon is assumed to be be in WGS84. The point will be reprojected to whatever CRS is used in the layer it is being stored to
         
         The filename is by default the selected filename. For data types where each spectre is stored in a separate file, the filename for each file can be given.
+        The function should set self.read to the number of lines that have been read successfully and self.readfailure to the number of lines that have had problems
+        
+        The reader function can throw an execption that will stop the reading and will print
+        to the python console. Any data that have been read successfully befor the expection will stay stored.
         """
     
         
@@ -295,6 +304,8 @@ class DataLoader:
             #TODO: Other file reading functions - eg. based on file name
             # TODO: Hourglass cursor while reading data.
             # Progressbar?
+            # To import other type of files, define some logic to recognice them here and 
+            # write a reader function that calls self.insertpoints as defined above
             if self.filename.endswith('.csv'):
                 self.readRSI(self.filename)
             elif self.filename.endswith('.spe'):

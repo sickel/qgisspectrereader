@@ -25,6 +25,8 @@ repository=https://github.com/sickel/qgisspectrereader
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 changelog=v1.0 Dynamic selection of fields in RSI files to allow reading of other setups
+
+>>>>>>> 62166a3f76f86afe7de0e494161a629b538692fe
 # Tags are comma separated with spaces allowed
 tags=gamma,spectrometry,spectral data
 
@@ -43,7 +45,7 @@ deprecated=False
 # plugin_dependencies=
 
 Category of the plugin: Raster, Vector, Database or Web
-# category=
+# category=Vector
 
 # If the plugin can run on QGIS Server.
 server=False
