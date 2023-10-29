@@ -6,11 +6,18 @@
 name=Spectral data loader
 qgisMinimumVersion=3.0
 description=Loads spectral data
-version=0.11
+version=1.0
 author=Morten Sickel
 email=morten@sickel.net
 
-about=Loads spectral data into a layer. Possible to create a customised layer. To be used to import csv-files exported from RSI instruments.
+about=Loads spectral data into a layer. Possible to create a customised layer. To be used to import  spe files in a directory or csv-files exported from RSI instruments. 
+    
+    The spectra can be displayed using the plugin Spectre Viewer.
+    
+    <b>Usage</b>
+    The mission field can be left blank. The text will be used to name a new layer and will be added to the name of any new layer. 
+    For files with data from one detector, spectre2 and dose2 will be left blank. 
+
 
 tracker=https://github.com/sickel/qgisspectrereader
 repository=https://github.com/sickel/qgisspectrereader
@@ -20,8 +27,8 @@ repository=https://github.com/sickel/qgisspectrereader
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=Cleaned metadata
-
+changelog=v1.0 Dynamic selection of fields in RSI files to allow reading of other setups
+s
 # Tags are comma separated with spaces allowed
 tags=gamma,spectrometry,spectral data
 
@@ -29,7 +36,7 @@ homepage=https://github.com/sickel/qgisspectrereader
 category=Vector
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
