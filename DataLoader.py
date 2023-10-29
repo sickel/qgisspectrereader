@@ -40,6 +40,8 @@ from qgis.gui import QgsFileWidget
 from PyQt5.QtCore import *
 #from PyQt.QtGui import QFileDialog
 from qgis.core import QgsExpression
+from datetime import date,time,datetime
+
 
 class unknownFileType(Exception):
     pass
@@ -402,22 +404,24 @@ class DataLoader:
         Reads a csv file exported from RSI's radassist. The file has a two line header.
         It is assumed 1024ch spectra
         """
+        colnames = ['Lat','Long','Alt[m]','UtcTime','Laser_Alt [M]','press','temp','LineNum','UtcDate']
         chnum=1024
-        fs={'lat':9,
-            'lon':8,
-            'gpsalt':10,
-            'acqtime':1,
+        fs={'Lat':9,
+            'Long':8,
+            'Alt[m]':10,
+            'UtcTime':1,
             'dose1':14,
             'dose2':28,
-            'laseralt':24,
+            'Laser_Alt [M]':24,
             'radaralt':23,
             'press':22,
             'temp':21,
-            'line':11}
-        fs['alt']=fs['laseralt']
+            'LineNum':11}
+        fs['alt']=fs['Laser_Alt [M]']
         #TODO: User selectable field mapping
         header=True
         idxs=[]
+        timestampwarned = False
         with open(self.filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
@@ -432,19 +436,37 @@ class DataLoader:
                         get_indexes = lambda x, xs: [i for (y, i) in zip(xs, range(len(xs))) if x in y]
                         idxs=get_indexes("Spectrum VD",data)
                     if idx == 2:
-                        fs['lat'] = data.index('Lat')
-                        fs['lon'] = data.index('Long')
-                        fs['gpsalt'] = data.index('Alt[m]')
+                        for col in colnames:
+                            if col in data:
+                                fs[col] = data.index(col)
+                            else:
+                                fs[col] = None
                         print(f'fs:{fs}')
                     header = idx<2
                 else:
-                    vd1=self.lst2arr(data[idxs[0]:idxs[0]+chnum])
-                    vd2=self.lst2arr(data[idxs[1]:idxs[1]+chnum])
+                    dataprep = {}
+                    vd1 = self.lst2arr(data[idxs[0]:idxs[0]+chnum])
+                    vd2 = self.lst2arr(data[idxs[1]:idxs[1]+chnum])
+                    try:
+                        timestamp = int(data[fs['UtcTime']])
+                    except:
+                        if not timestampwarned:
+                            message = "Timestamp not as epoch time, assuming today UTC"
+                            level = Qgis.Warning
+                            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+                            timestampwarned = True
+                        (h,m,s) = data[fs['UtcTime']].split(':')
+                        timestamp = int(datetime.combine(date.today(),time(int(h),int(m),int(s))).timestamp())
+                        
+                    for col in colnames:
+                        if not fs[col] is None:
+                            dataprep[col] = data[fs[col]]
+                        else:
+                            dataprep[col] = None
                     # TODO: Make a timestamp from the epoch number
-                    
-                    insdata=[data[fs['gpsalt']], data[fs['acqtime']], data[fs['dose1']], data[fs['dose2']],vd1, vd2, data[fs['laseralt']], data[fs['press']], data[fs['temp']], data[fs['line']]]
+                    insdata=[dataprep['Alt[m]'], timestamp, data[fs['dose1']], data[fs['dose2']],vd1, vd2, dataprep['Laser_Alt [M]'], dataprep['press'], dataprep['temp'], dataprep['LineNum']]
                     #print(insdata)
-                    self.insertpoint(data[fs['lat']],data[fs['lon']],insdata)
+                    self.insertpoint(data[fs['Lat']],data[fs['Long']],insdata)
                 
     def insertpoint(self,lat,lon,insdata,filename = None):
         """
