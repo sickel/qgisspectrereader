@@ -521,15 +521,14 @@ class DataLoader:
             self.readfailure+=1
             print(e)
 
-    def createlayer(self):
+    def createlayer(self,layername="Spectral data"):
         """
         Creates a new layer designed for storage of imported data
         
         """
-        layername="Spectral data"
-        mission=self.dlg.leMission.text()
+        mission = self.dlg.leMission.text()
         if mission > '':
-            layername="{} ({})".format(layername,mission)
+            layername = f"{layername} ({mission})"
         # Uses the project to set a crs for the layer
         # TODO: Show a reminder if project == EPSG3246, that this may not be what one wants
         CRS= QgsProject.instance().crs()
@@ -539,21 +538,24 @@ class DataLoader:
         vl.startEditing()
         # is this needed?
         # add fields
-        pr.addAttributes( [
+               pr.addAttributes( [
                         QgsField("id",QVariant.Int),
                         QgsField("gpsaltitude", QVariant.Double),
-                        QgsField("acqtime",  QVariant.String),
+                        QgsField("utctime",  QVariant.String),
                         QgsField("dose1", QVariant.Double),
                         QgsField("dose2", QVariant.Double),
                         QgsField("spectre1", QVariant.String),
                         QgsField("spectre2", QVariant.String),
-                        QgsField("altitude", QVariant.Double),
+                        QgsField("laseraltitude", QVariant.Double),
+                        QgsField("radaraltitude", QVariant.Double), 
                         QgsField("pressure", QVariant.Double),
                         QgsField("temperature", QVariant.Double),
                         QgsField("linenumber", QVariant.Int),
                         QgsField("filename", QVariant.String),
-                        QgsField("mission", QVariant.String)] )
-
+                        QgsField("mission", QVariant.String),
+                        QgsField("detcount",QVariant.Int),
+                        QgsField("livetime",QVariant.Double)
+                        ])
         # Commit changes - is this needed?
         vl.commitChanges()
         # To display the new layer in the project
