@@ -48,7 +48,7 @@ def extractchannels(arrayfield, fromch, toch, feature, parent):
     
     <h2>Example usage:</h2>
     <ul>
-      <li>extractchs(field,fromch,toch) -> integer</li>
+      <li>extractchannels(field,fromch,toch) -> integer</li>
     </ul>
     
     """
@@ -80,7 +80,7 @@ def extractpeak(arrayfield, fromch, toch, borderch, feature, parent):
     
     <h2>Example usage:</h2>
     <ul>
-      <li>extractchs(field,fromch,toch,borderch) -> integer</li>
+      <li>extractpeak(field,fromch,toch,borderch) -> integer</li>
     </ul>
     
     """
@@ -98,4 +98,21 @@ def extractpeak(arrayfield, fromch, toch, borderch, feature, parent):
         peak[i] = peak[i]*deltach*i+1
     return sum(peak)
 
-
+@qgsfunction(args='auto', group='Gamma')
+def gmm_total(arrayfield,feature,parent):
+    """
+    <h2>Description</h2>
+    Calculates the sum of all channels for a spectre.
+    <h2>Example usage:</h2>
+    <ul>
+    <li>gmm_total(<arrayfield>) -> integer</li>
+    
+    """
+    removelast = 1
+    spec=arrayfield
+    if isinstance(spec, str):
+        spec=spec.split(',')
+    if removelast > 0:
+        del spec[-1*removelast] # Cosmic in RSI-spectre
+    spec = list(map(float, spec)) 
+    return(sum(spec))
