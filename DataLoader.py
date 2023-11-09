@@ -407,7 +407,7 @@ class DataLoader:
                     if line.startswith('$TEMPERATURE:'):
                         temperature=f.readline().strip()
             try:
-                insdata=[float(gpsdata['Alt']),date,float(dose),'',spectre,'',2,'', float(temperature), '']
+                insdata=[float(gpsdata['Alt']), date, 2, 2, None, float(temperature), None, date, 1, None, dose, None, None, None, spectre, None, date]
                 #print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
                 # print(f'{filename} OK')
