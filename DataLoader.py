@@ -354,6 +354,9 @@ class DataLoader:
         """
         Reads a directory with spe-files
         Select one file within the directory - all will be read
+        
+        TODO: Important - rewrite to insert in new data format
+        
         """
         directory=os.path.split(filename)[0]
         files=os.listdir(directory)
@@ -417,24 +420,25 @@ class DataLoader:
         It is assumed 1024ch spectra
         """
         chnum=1024
+        # TODO: Calculate chnum from the header.
         # Maximum number of detectors to read in
         maxdets = 2
         # General info to look for
-        colnames = ['Lat','Long','Alt[m]','UtcTime','Laser_Alt [M]','RAD_ALT [M]','Pres','Temp','LineNum'] #,'UtcDate']
+        colnames = ['Lat', 'Long', 'Alt[m]', 'UtcTime', 'Laser_Alt [M]', 'RAD_ALT [M]', 'Pres', 'Temp', 'LineNum','UtcDate']
         # Detector specific data:
         perdetector = ['DetCount','LiveTime','Doserate'] # ,'PPT_PRES','PPT_TEMP']
-        #TODO: User selectable field mapping
+        #TODO: User selectable field mapping - will it still be needed?
         header = True
         fields = {}
         vdidxs = []
         roiidxs = []
-        roidata = []
         timestampwarned = False
+        self.readfailure = 0
         with open(self.filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
                 if(header):
-                    # RSI export CSV has a three line header. 
+                    # RSI exported CSV has a three line header. 
                     # Need to fetch some information from it to find fields
                     if idx == 0:
                         # First line is always empty
@@ -446,6 +450,8 @@ class DataLoader:
                         # Looking for where VD spectra start
                         vdidxs=get_indexes("Spectrum VD",data)
                         # Looking for where ROIdata starts
+                        # Roidata contains per detector information 
+                        # such as livetime, detector count and dose rate
                         roiidxs = get_indexes("ROI for Virtual Detector",data)
                     if idx == 2:
                         # May need this later on, or maybe not?
@@ -464,7 +470,12 @@ class DataLoader:
                                 if data[col] in perdetector and ridx < maxdets:
                                     fields[f"{data[col]}{ridx+1}"]=col
                                 col+= 1
-                      print(f'fields:{fields}')
+                        # Pressure and temperature may be stored as per detector data
+                        if fields['Pres'] is None and 'PPT_PRES [mbar]' in data:
+                            fields['Pres'] = data.index('PPT_PRES [mbar]')
+                        if fields['Temp'] is None and 'PPT_TEMP [°C]' in data:
+                            fields['Temp'] = data.index('PPT_TEMP [°C]')
+                        print(f'fields:{fields}')
                         lonfield = fields.pop('Long')
                         latfield = fields.pop('Lat')
                     # To go on with real data after the three lines of header
@@ -472,77 +483,106 @@ class DataLoader:
                     # Lat and lon are treated differently than the other fields
                     
                 else:
-                    vd2 = None
+                    lat = data[latfield]
+                    lon = data[lonfield]
+                    if lat == 0 and lon == 0:
+                        # Assumes no gpsdata, bad luck if someone is collecting data at this point...
+                        self.readfailure+=1
+                        continue
+                    # Reading in one or two spectra
+                    # The RSI file may contain more spectra, the are ignored for the time being
+                    # TODO: Look into reading more spectra from RSI-file
+                    # Possible solution: Make a file with data from one detector, mark detector number
+                    # per line, filter on detector number. On the other hand, this will make a mess if 
+                    # the data are not correctly filtered.
+                    # Another solution: make separate data sets for the different detectors
                     vd1 = self.lst2arr(data[vdidxs[0]:vdidxs[0]+chnum])
                     if len(vdidxs) > 1:
                         vd2 = self.lst2arr(data[vdidxs[1]:vdidxs[1]+chnum])
+                    else:
+                        vd2 = None
                     try:
-                        timestamp = int(data[fields['UtcTime']])
+                        
+                        epoch = int(data[fields['UtcTime']])
+                        timestamp = datetime.fromtimestamp( epoch ).isoformat()
+                        
                         # Timestamp may either be epoch is secounds or hh:mnm:ss ...
-                    except:
+                    except ValueError:
+                        # The utctime is not a number. Probably h:m:s
                         if not timestampwarned:
                             message = "Timestamp not as epoch time, assuming today UTC"
                             level = Qgis.Warning
                             self.iface.messageBar().pushMessage("Data Loader", message, level=level)
                             timestampwarned = True
                         (h,m,s) = data[fields['UtcTime']].split(':')
-                        timestamp = int(datetime.combine(date.today(),time(int(h),int(m),int(s))).timestamp())
-                        data[fields['UtcTime']] = timestamp
+                        epoch = int(datetime.combine(date.today(),time(int(h),int(m),int(s))).timestamp())
+                        timestamp = data[fields['UtcTime']]
+                        data[fields['UtcTime']] = epoch
+                        if not fields['UtcDate'] is None:
+                            timestamp = f"{data[fields['UtcDate']]}T{timestamp}"
                     # position data need some special treatment and shall not end up in fields
-                    lat = data[latfield]
-                    lon = data[lonfield]
-                    if lat == 0 and lon == 0:
-                        # No gpsdata, bad luck if someone is collecting data at this point...
-                        continue
                     insdata = []
                     for field in fields:
-                        if fields[field] is None or fields[field] == '':
+                        if fields[field] is None or data[fields[field]] == '':
                             insdata.append(None)
                         else:
                             insdata.append(data[fields[field]])
+                    # Adds on the spectra       
                     insdata.append(vd1)
                     insdata.append(vd2)
-                    self.insertpoint(lat,lon,insdata)
+                    insdata.append(timestamp)
+                    try:
+                        self.insertpoint(lat,lon,insdata)
+                    except Exception as e:
+                        self.readfailure+=1
+                        print(e)
+                        print(insdata)
+                        # This will abort the import after the first failure.
+                        # TODO: Make this user selectable
+                        # TODO: Log errors to file
+                        return()
                 
     def insertpoint(self,lat,lon,insdata,filename = None):
         """
         Inserts a newly defined point into the selected layer. 
         
-        Filename may be set for data types where each spectrum is in a separate file.
+        Filename may be set . Makes most sense for data types where each spectrum is in a separate file.
+        
+        Exceptions here should be handled by the caller
         """
-        # print(insdata)
         if filename is None:
             filename = self.filename
-        # print(filename)
+        # Functions to use to convert the data before inserting
+        # The keys are the variant typeNames in the table
+        # TODO: Go back and check if things still works with postgres backend
         converts = {'integer': int, 'double': float,'string':str}
-        try:
-            # Putting in the last data:
-            self.maxid+=1
-            insdata.insert(0,self.maxid)    
-            insdata.append(filename)
-            insdata.append(self.mission)
-            # Setting the right data type:
-            for i in range(0,len(insdata)):
-                if insdata[i] is None:
-                    continue
-                insdata[i] = converts[self.pr.fields()[i].typeName()](insdata[i])
-            
-            feature = QgsFeature()
-            point=QgsPointXY(float(lon),float(lat))
-            # Transforms the point to the right CRS
-            prpoint=self.transformation.transform(point)
-            geom=QgsGeometry.fromPointXY(prpoint)
-            feature.setGeometry(geom)
-            
-            # Any empty string should be null value
-            insdata=[x if x !='' else None for x in insdata]
-            feature.setAttributes(insdata)
-            # The feature to be added is set up, time to add it to the data set
-            self.pr.addFeatures( [ feature ] )
-            self.read+=1
-        except Exception as e:
-            self.readfailure+=1
-            print(e)
+        # Putting in the last data:
+        self.maxid+=1
+        insdata.insert(0,self.maxid)    
+        insdata.append(filename)
+        insdata.append(self.mission)
+        # Setting the right data type:
+        insdata=[x if x !='' else None for x in insdata]
+        for i in range(0,len(insdata)):
+            if insdata[i] is None:
+                continue
+                # Leave Nones as they are
+            insdata[i] = converts[self.pr.fields()[i].typeName()](insdata[i])
+            # Data are coming in as strings.
+            # TODO: Make a custom exception so it is possible to fail out with more information
+        feature = QgsFeature()
+        point=QgsPointXY(float(lon),float(lat))
+        # TODO: Could / should this be a 3d point?
+        # Transforms the point to the right CRS
+        prpoint=self.transformation.transform(point)
+        geom=QgsGeometry.fromPointXY(prpoint)
+        feature.setGeometry(geom)
+        # Any empty string should be null value
+        feature.setAttributes(insdata)
+        # The feature to be added is set up, time to add it to the data set
+        self.pr.addFeatures( [ feature ] )
+        self.read+=1
+
 
     def createlayer(self):
         """
@@ -555,6 +595,7 @@ class DataLoader:
             layername = f"{layername} ({mission})"
         # Uses the project to set a crs for the layer
         # TODO: Show a reminder if project == EPSG3246, that this may not be what one wants
+        # TODO: Drop down to select CRS
         CRS= QgsProject.instance().crs()
         vl = QgsVectorLayer("Point", layername, "memory",crs=CRS)
         pr = vl.dataProvider()
@@ -571,6 +612,7 @@ class DataLoader:
                     QgsField("pressure", QVariant.Double),
                     QgsField("temperature", QVariant.Double),
                     QgsField("linenumber", QVariant.Int),
+                    QgsField("utcdate", QVariant.String),
                     QgsField("detcount1",QVariant.Int),
                     QgsField("livetime1",QVariant.Double),
                     QgsField("doserate1", QVariant.Double),
@@ -579,6 +621,7 @@ class DataLoader:
                     QgsField("doserate2", QVariant.Double),
                     QgsField("spectre1", QVariant.String),
                     QgsField("spectre2", QVariant.String),
+                    QgsField("timestamp", QVariant.String),
                     QgsField("filename", QVariant.String),
                     QgsField("mission", QVariant.String)
                     ])
