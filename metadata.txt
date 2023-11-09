@@ -1,21 +1,19 @@
-# This file contains metadata for your plugin.
-
-# This file should be included when you package your plugin.# Mandatory items:
-
 [general]
 name=Spectral data loader
 qgisMinimumVersion=3.0
 description=Loads spectral data
-version=1.05
+version=1.1
 author=Morten Sickel
-email=morten@sickel.net
+email=morten@sickel.net                    
+about=Loads spectral data into a layer. Possible to create a customised layer. To be used to import a set of geolocated spe files in a directory or csv-files exported from RSI radassist. The RSI csv files has a three line header and several fields that are to be collected for the spectre field, so it can not be imported using the normal csv-import function.
 
-about=Loads spectral data into a layer. Possible to create a customised layer. To be used to import spe files in a directory or csv-files exported from RSI instruments. 
     The spectra can be displayed using the plugin Spectre Viewer.
     <b>Usage</b>
     The mission field can be left blank. The text will be used to name a new layer and will be added to the name of any new layer. 
     For files with data from one detector, spectre2 and dose2, livetime2 and detcount2 will be left blank. 
 
+    The plugin will also install some new functions to do calculations on spectra for the field calculator. All these functions can be found in the group Gamma
+    
 tracker=https://github.com/sickel/qgisspectrereader
 repository=https://github.com/sickel/qgisspectrereader
 # End of mandatory metadata
@@ -24,7 +22,9 @@ repository=https://github.com/sickel/qgisspectrereader
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=v1.05 Better selection of fields from RSI file. New data format. .spe does not work for the moment
+changelog=v1.1 .spe files can be read into the new data format
+    v1.05 Better selection of fields from RSI file. New data format. .spe does not work for the moment. 
+          Added a new function for calculating the channelsum of a spectre
     v1.0 Dynamic selection of fields in RSI files to allow reading of other setups
 
 # Tags are comma separated with spaces allowed
@@ -34,7 +34,7 @@ homepage=https://github.com/sickel/qgisspectrereader
 category=Vector
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
@@ -44,8 +44,6 @@ deprecated=False
 # Check the documentation for more information.
 # plugin_dependencies=
 
-Category of the plugin: Raster, Vector, Database or Web
-# category=Vector
 
 # If the plugin can run on QGIS Server.
 server=False
