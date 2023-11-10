@@ -296,11 +296,11 @@ class DataLoader:
         # or to call QGIS CRS selection dialog?
         toCRS= self.vl.crs()
         # The CRS of the vl is set to the same as the project when the vl is created
-        
         self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
         try:
-            self.read=0
-            self.readfailure=0
+            self.read = 0
+            self.readfailure = 0
+            self.abortOnFailure = True
             #TODO: Other file reading functions - eg. based on file name
             # TODO: Hourglass cursor while reading data.
             # Progressbar? QprogressBar
@@ -407,6 +407,7 @@ class DataLoader:
                     if line.startswith('$TEMPERATURE:'):
                         temperature=f.readline().strip()
             try:
+                # TODO: Send the data to insertpoint as a dictionary
                 insdata=[float(gpsdata['Alt']), date, 2, 2, None, float(temperature), None, date, 1, None, dose, None, None, None, spectre, None, date]
                 #print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
@@ -475,7 +476,7 @@ class DataLoader:
                             fields['Pres'] = data.index('PPT_PRES [mbar]')
                         if fields['Temp'] is None and 'PPT_TEMP [°C]' in data:
                             fields['Temp'] = data.index('PPT_TEMP [°C]')
-                        print(f'fields:{fields}')
+                        # print(f'fields:{fields}')
                         lonfield = fields.pop('Long')
                         latfield = fields.pop('Lat')
                     # To go on with real data after the three lines of header
@@ -531,16 +532,23 @@ class DataLoader:
                     insdata.append(vd1)
                     insdata.append(vd2)
                     insdata.append(timestamp)
+                    # TODO: Send the data to insertpoint as a dictionary
+                    # Write a wrapper to insertpoint that creates the list from the dict|
                     try:
                         self.insertpoint(lat,lon,insdata)
                     except Exception as e:
                         self.readfailure+=1
-                        print(e)
                         print(insdata)
+                        print(e)
                         # This will abort the import after the first failure.
                         # TODO: Make this user selectable
+                        # self.abortOnFailure is hardcoded to True in init
                         # TODO: Log errors to file
-                        return()
+                        if self.abortOnFailure:
+                            message = f"Error when importing {self.filename} - Aborting, rerun and see python console for details"
+                            level = Qgis.Critical
+                            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+                            return()
                 
     def insertpoint(self,lat,lon,insdata,filename = None):
         """
