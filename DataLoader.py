@@ -189,9 +189,6 @@ class DataLoader:
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
-#            self.iface.removePluginVectorMenu(
-#                self.tr(u'Load spectral data'),
-#                action)
             self.iface.removePluginVectorMenu(
                 self.tr(u'Spectral data'),
                 action)
@@ -252,17 +249,23 @@ class DataLoader:
         
         altitude, floating point number (above sea level, e.g. gps altitude) - 
         sampling time, string (any format, but it should preferably be consistent)
-        dose for detector 1, floating point number
-        dose for detector 2, floating point number
-        spectre for detector 1, string consiting of a comma separated list of integers 
-        spectre for detector 2, string consiting of a comma separated list of integers
-        height above ground, fl oating point number, e.g. radar or laster altitude
+        height above ground1, floating point number, e.g. radar or laster altitude
+        height above ground2, floating point number, e.g. radar or laster altitude
         pressure, floating point number
         temperature, floating point number
         line number, integer e.g. line number in a flight pattern
-
-        The values can all be strings in the call to insertpoints, but they need to be parseable as the above mentioned
-        data types.
+        utcdate: Date for data collection
+        detcount1: Numbers of detector elements in detector 1, integer
+        livetime1: Livetime for detector 1, float
+        dose for detector 1, floating point number
+        detcount2: Numbers of detector elements in detector 2, integer
+        livetime2: Livetime for detector 2, float
+        dose for detector 2, floating point number
+        spectre for detector 1, string consiting of a comma separated list of integers 
+        spectre for detector 2, string consiting of a comma separated list of integers
+        timestamp: timestamp, string
+        
+        The values can all be strings in the call to insertpoints, but they need to be parseable as the above mentioned data types.
         
         Unknown data kan be represented by an empty string or None. These will both be stored as NULL.
 
@@ -356,6 +359,7 @@ class DataLoader:
         Select one file within the directory - all will be read
         
         TODO: Important - rewrite to insert in new data format
+        TODO: Test with new data format
         
         """
         directory=os.path.split(filename)[0]
@@ -367,53 +371,58 @@ class DataLoader:
         readGPS=False
         
         for filename in spefiles:
-            spectre=[]
-            gpsdata=dict()
-            dose = 0
-            temperature = 0
-            encoding = self.checkencoding(directory+'/'+filename)
-            #encoding = 'utf-16'
-            if encoding is None:
-                encoding = 'latin-1'
-            # print(encoding)
-            with open(directory+'/'+filename, "r",encoding=encoding) as f:
-                # print(f"reading {filename}")
-                for line in f:
-                    if readspec:
-                        if not line.startswith('$'):
-                            spectre.append(line.strip())
-                            continue
-                        else:
-                            readspec=False
-                            spectre=self.lst2arr(spectre)
-                    if readGPS:
-                        # print('Reading GPS')
-                        if not line.startswith('$'):
-                            parts=line.split('=')
-                            gpsdata[parts[0]]=parts[1].strip()
-                            continue
-                    readGPS = line.startswith('$GPS:')
-                    if line.startswith('$DATE_MEA:'):
-                        date=f.readline()
-                        continue
-                    if line.startswith('$DATA'):
-                        readspec=True
-                        #print(line)
-                        nlines=f.readline()
-                        #print(nlines)
-                        nlines=nlines.split()[1].strip()
-                    if line.startswith('$DOSE_RATE:'):
-                        dose=f.readline().strip()
-                    if line.startswith('$TEMPERATURE:'):
-                        temperature=f.readline().strip()
             try:
-                insdata=[float(gpsdata['Alt']), date, 2, 2, None, float(temperature), None, date, 1, None, dose, None, None, None, spectre, None, date]
+                insdata = self.parsespefile(filename,directory)
                 #print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
                 # print(f'{filename} OK')
             except:
                 print(f'No valid data found in {filename}!')
-            
+
+    def parsespefile(self, filename,directory):
+        spectre=[]
+        gpsdata=dict()
+        dose = 0
+        temperature = 0
+        encoding = self.checkencoding(directory+'/'+filename)
+        #encoding = 'utf-16'
+        if encoding is None:
+            encoding = 'latin-1'
+        # print(encoding)
+        with open(directory+'/'+filename, "r",encoding=encoding) as f:
+            # print(f"reading {filename}")
+            for line in f:
+                if readspec:
+                    if not line.startswith('$'):
+                        spectre.append(line.strip())
+                        continue
+                    else:
+                        readspec=False
+                        spectre=self.lst2arr(spectre)
+                if readGPS:
+                    # print('Reading GPS')
+                    if not line.startswith('$'):
+                        parts=line.split('=')
+                        gpsdata[parts[0]]=parts[1].strip()
+                        continue
+                readGPS = line.startswith('$GPS:')
+                if line.startswith('$DATE_MEA:'):
+                    date=f.readline()
+                    continue
+                if line.startswith('$DATA'):
+                    readspec=True
+                    #print(line)
+                    nlines=f.readline()
+                    #print(nlines)
+                    nlines=nlines.split()[1].strip()
+                if line.startswith('$DOSE_RATE:'):
+                    dose=f.readline().strip()
+                if line.startswith('$TEMPERATURE:'):
+                    temperature=f.readline().strip()
+        insdata=[float(gpsdata['Alt']), date, 2, 2, None, float(temperature), None, date, 1, None, dose, None, None, None, spectre, None, date]
+        return insdata
+    
+    
     def readRSI(self,filename):
         """
         Reads a csv file exported from RSI's radassist. The file has a three line header.
