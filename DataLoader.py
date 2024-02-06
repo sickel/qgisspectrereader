@@ -42,6 +42,7 @@ from PyQt5.QtCore import *
 from qgis.core import QgsExpression
 from datetime import date,time,datetime
 
+import xml.etree.ElementTree as ET
 
 class unknownFileType(Exception):
     pass
@@ -285,7 +286,10 @@ class DataLoader:
         self.vl=self.dlg.cbMapLayer.currentLayer()
         layer=self.iface.activeLayer()
         idx=layer.fields().indexFromName('id')
-        self.maxid=max(0,layer.maximumValue(idx))
+        try:
+            self.maxid=max(0,layer.maximumValue(idx))
+        except TypeError:
+            self.maxid = 0
         # print(self.maxid)
         self.pr = self.vl.dataProvider()
         self.filename=self.dlg.FileWidget.filePath()
@@ -314,6 +318,8 @@ class DataLoader:
                 self.readRSI(self.filename)
             elif self.filename.endswith('.spe'):
                 self.readspe(self.filename)
+            elif self.filename.endswith('.n42') or self.filename.endswith('.xml'):
+                self.readn42(self.filename)
             else:
                 raise unknownFileType()
             # Refreshes canvas and clears dialog to make it clear that the data have been imported
@@ -352,6 +358,28 @@ class DataLoader:
             else:
                 encoding=None
         return(encoding)
+    
+    def readn42(self,filename):
+        base = '{http://physics.nist.gov/N42/2011/N42}'
+        tree = ET.parse(filename)
+        root = tree.getroot()
+        print("parsed OK")
+        for measurement in root.findall(f'{base}RadMeasurement'):
+        #for measurement in root:
+            spectrum = None 
+            print("New measurement")
+            print(measurement.tag , measurement.attrib, measurement.text)
+            for detail in measurement:
+                if detail.tag.endswith('Spectrum'):
+                    for specdet in detail:
+                        print(specdet.tag, specdet.attrib)
+                        if specdet.tag.endswith('Channeldata'):
+                            print('Found spec!!!')
+                            spectrum = specdet.text
+                print(detail.tag, detail.attrib, detail.text)
+            print(spectrum)
+        print("Finished")
+
         
     def readspe(self,filename):
         """
