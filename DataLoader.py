@@ -443,6 +443,7 @@ class DataLoader:
         roiidxs = []
         timestampwarned = False
         self.readfailure = 0
+        useUTCtime = self.dlg.cBUTC.isChecked()
         with open(self.filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
@@ -511,10 +512,11 @@ class DataLoader:
                     else:
                         vd2 = None
                     try:
-                        
                         epoch = int(data[fields['UtcTime']])
-                        timestamp = datetime.fromtimestamp( epoch ).isoformat()
-                        
+                        if useUTCtime:
+                            timestamp = datetime.utcfromtimestamp( epoch ).isoformat()
+                        else:
+                            timestamp = datetime.fromtimestamp( epoch ).isoformat()
                         # Timestamp may either be epoch is secounds or hh:mnm:ss ...
                     except ValueError:
                         # The utctime is not a number. Probably h:m:s
