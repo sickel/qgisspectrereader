@@ -386,26 +386,25 @@ class DataLoader:
         Reads a directory with spe-files
         Select one file within the directory - all will be read
         
-        TODO: Important - rewrite to insert in new data format
-        TODO: Test with new data format
+        DONE: Important - rewrite to insert in new data format
+        DONE: Test with new data format
         
         """
         directory=os.path.split(filename)[0]
         files=os.listdir(directory)
         spefiles=list(filter(lambda x: x.endswith('.spe'), files))
         spefiles.sort()
-        # print(spefiles)
-        readspec=False
-        readGPS=False
+        print(spefiles)
         
         for filename in spefiles:
             try:
-                insdata = self.parsespefile(filename,directory)
-                #print(f"insdata;{insdata}")
+                insdata,gpsdata = self.parsespefile(filename,directory)
+                # print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
                 # print(f'{filename} OK')
-            except:
-                print(f'No valid data found in {filename}!')
+            except Exception as e:
+                print(e) 
+                print(f'Problems reading {filename}!')
 
     def parsespefile(self, filename,directory):
         spectre=[]
@@ -417,22 +416,30 @@ class DataLoader:
         if encoding is None:
             encoding = 'latin-1'
         # print(encoding)
+        readspec=False
+        readGPS=False
         with open(directory+'/'+filename, "r",encoding=encoding) as f:
             # print(f"reading {filename}")
             for line in f:
+                line = line.strip()
                 if readspec:
                     if not line.startswith('$'):
-                        spectre.append(line.strip())
+                        spectre.append(line)
                         continue
                     else:
                         readspec=False
                         spectre=self.lst2arr(spectre)
                 if readGPS:
-                    # print('Reading GPS')
+                    print('Reading GPS')
+                    print(line)
                     if not line.startswith('$'):
                         parts=line.split('=')
+                        print(parts)
+                        print(gpsdata)
                         gpsdata[parts[0]]=parts[1].strip()
                         continue
+                    else:
+                        readGPS = False
                 readGPS = line.startswith('$GPS:')
                 if line.startswith('$DATE_MEA:'):
                     date=f.readline()
@@ -448,7 +455,7 @@ class DataLoader:
                 if line.startswith('$TEMPERATURE:'):
                     temperature=f.readline().strip()
         insdata=[float(gpsdata['Alt']), date, 2, 2, None, float(temperature), None, date, 1, None, dose, None, None, None, spectre, None, date]
-        return insdata
+        return insdata,gpsdata
     
     
     def readRSI(self,filename):
