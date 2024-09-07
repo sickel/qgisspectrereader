@@ -578,6 +578,10 @@ class DataLoader:
             insdata[i] = converts[self.pr.fields()[i].typeName()](insdata[i])
             # Data are coming in as strings.
             # TODO: Make a custom exception so it is possible to fail out with more information
+        # Add fields for total counts in each detector:
+        insdata.append(self.calculatetotal(insdata[15]))
+        insdata.append(self.calculatetotal(insdata[16]))
+        
         feature = QgsFeature()
         point=QgsPointXY(float(lon),float(lat))
         # TODO: Could / should this be a 3d point?
@@ -592,6 +596,13 @@ class DataLoader:
         self.read+=1
 
 
+    def calculatetotal(self,spectre):
+        total = 0
+        chs = spectre.split(',')
+        for ch in chs:
+            total += int(ch)
+        return(total)
+            
     def createlayer(self):
         """
         Creates a new layer designed for storage of imported data
@@ -617,21 +628,23 @@ class DataLoader:
                     QgsField("utctime",  QVariant.String),
                     QgsField("laseraltitude", QVariant.Double),
                     QgsField("radaraltitude", QVariant.Double), 
-                    QgsField("pressure", QVariant.Double),
+                    QgsField("pressure", QVariant.Double), #5
                     QgsField("temperature", QVariant.Double),
                     QgsField("linenumber", QVariant.Int),
                     QgsField("utcdate", QVariant.String),
                     QgsField("detcount1",QVariant.Int),
-                    QgsField("livetime1",QVariant.Double),
+                    QgsField("livetime1",QVariant.Double), #10
                     QgsField("doserate1", QVariant.Double),
                     QgsField("detcount2",QVariant.Int),
                     QgsField("livetime2",QVariant.Double),
                     QgsField("doserate2", QVariant.Double),
-                    QgsField("spectre1", QVariant.String),
+                    QgsField("spectre1", QVariant.String), #15
                     QgsField("spectre2", QVariant.String),
                     QgsField("timestamp", QVariant.String),
                     QgsField("filename", QVariant.String),
-                    QgsField("mission", QVariant.String)
+                    QgsField("mission", QVariant.String),
+                    QgsField("totalcount1",QVariant.Int), #20
+                    QgsField("totalcount2",QVariant.Int),
                     ])
         # filename and mission should be kept as the two last fields 
         # as they will be added on later
