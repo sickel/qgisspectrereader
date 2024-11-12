@@ -317,7 +317,7 @@ class DataLoader:
             self.iface.mapCanvas().refreshAllLayers()
             self.dlg.leMission.clear()
             self.dlg.FileWidget.setFilePath("")
-            if self.readfailure==0:
+            if self.readfailure == 0:
                 message=f"{self.read} points from file imported sucessfully to '{self.vl.name()}'"
                 level=Qgis.Success   
             else:
@@ -473,7 +473,7 @@ class DataLoader:
                                 col+= 1
                         # Pressure and temperature may be stored as per detector data
                         if fields['Pres'] is None and 'PPT_PRES [mbar]' in data:
-                            fields['Pres'] = data.index('PPT_PRES [mbar]')
+                     #        fields['Pres'] = data.index('PPT_PRES [mbar]')
                         if fields['Temp'] is None and 'PPT_TEMP [°C]' in data:
                             fields['Temp'] = data.index('PPT_TEMP [°C]')
                         # print(f'fields:{fields}')
@@ -486,10 +486,11 @@ class DataLoader:
                 else:
                     lat = data[latfield]
                     lon = data[lonfield]
-                    if lat == 0 and lon == 0:
-                        # Assumes no gpsdata, bad luck if someone is collecting data at this point...
-                        self.readfailure+=1
-                        continue
+                    # THis functionallity is moved to insertpoint as it is needed for all file types
+                    # if lat == 0 and lon == 0:
+                    #    # Assumes no gpsdata, bad luck if someone is collecting data at this point...
+                    #    self.readfailure+=1
+                    #    continue
                     # Reading in one or two spectra
                     # The RSI file may contain more spectra, the are ignored for the time being
                     # TODO: Look into reading more spectra from RSI-file
@@ -554,10 +555,17 @@ class DataLoader:
         """
         Inserts a newly defined point into the selected layer. 
         
-        Filename may be set . Makes most sense for data types where each spectrum is in a separate file.
+        Filename  be set . Makes most sense for data types where each spectrum is in a separate file.
         
         Exceptions here should be handled by the caller
         """
+        self.noimport00 = True
+        # TODO: Set from UI
+        if self.noimport00 and lat == 0 and lon == 0:
+            message = f"Problem when reading point, 0,0 latitude and longitude"
+                            level = Qgis.Warning
+                            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+            return
         if filename is None:
             filename = self.filename
         # Functions to use to convert the data before inserting
