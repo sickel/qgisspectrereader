@@ -277,7 +277,6 @@ class DataLoader:
         to the python console. Any data that have been read successfully befor the expection will stay stored.
         """
     
-        
         self.mission=self.dlg.leMission.text()
         self.vl=self.dlg.cbMapLayer.currentLayer()
         layer=self.iface.activeLayer()
@@ -412,7 +411,8 @@ class DataLoader:
                 #print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
                 # print(f'{filename} OK')
-            except:
+            except Exception as e:
+                print(e)
                 print(f'No valid data found in {filename}!')
             
     def readRSI(self,filename):
@@ -435,6 +435,7 @@ class DataLoader:
         roiidxs = []
         timestampwarned = False
         self.readfailure = 0
+        useUTCtime = self.dlg.cBUTC.isChecked()
         with open(self.filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
@@ -473,7 +474,8 @@ class DataLoader:
                                 col+= 1
                         # Pressure and temperature may be stored as per detector data
                         if fields['Pres'] is None and 'PPT_PRES [mbar]' in data:
-                     #        fields['Pres'] = data.index('PPT_PRES [mbar]')
+                            pass
+                        #        fields['Pres'] = data.index('PPT_PRES [mbar]')
                         if fields['Temp'] is None and 'PPT_TEMP [°C]' in data:
                             fields['Temp'] = data.index('PPT_TEMP [°C]')
                         # print(f'fields:{fields}')
@@ -504,10 +506,11 @@ class DataLoader:
                     else:
                         vd2 = None
                     try:
-                        
                         epoch = int(data[fields['UtcTime']])
-                        timestamp = datetime.fromtimestamp( epoch ).isoformat()
-                        
+                        if useUTCtime:
+                            timestamp = datetime.utcfromtimestamp( epoch ).isoformat()
+                        else:
+                            timestamp = datetime.fromtimestamp( epoch ).isoformat()
                         # Timestamp may either be epoch is secounds or hh:mnm:ss ...
                     except ValueError:
                         # The utctime is not a number. Probably h:m:s
@@ -559,13 +562,15 @@ class DataLoader:
         
         Exceptions here should be handled by the caller
         """
-        self.noimport00 = True
+        self.noimport00 = False
+        print(f"{lat},{lon}")
         # TODO: Set from UI
         if self.noimport00 and lat == 0 and lon == 0:
             message = f"Problem when reading point, 0,0 latitude and longitude"
-                            level = Qgis.Warning
-                            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+            level = Qgis.Warning
+            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
             return
+        print('OK')
         if filename is None:
             filename = self.filename
         # Functions to use to convert the data before inserting
@@ -606,10 +611,12 @@ class DataLoader:
 
     def calculatetotal(self,spectre):
         total = 0
+        if spectre is None:
+            return 0
         chs = spectre.split(',')
         for ch in chs:
             total += int(ch)
-        return(total)
+        return total
             
     def createlayer(self):
         """
