@@ -284,7 +284,11 @@ class DataLoader:
         self.vl=self.dlg.cbMapLayer.currentLayer()
         layer=self.iface.activeLayer()
         idx=layer.fields().indexFromName('id')
-        self.maxid=max(0,layer.maximumValue(idx))
+        try:
+            self.maxid = max(0,layer.maximumValue(idx))
+        except TypeError:
+            self.maxid = 0
+            #layer.maximumVakye(idx) may not be defined
         # print(self.maxid)
         self.pr = self.vl.dataProvider()
         self.filename=self.dlg.FileWidget.filePath()
@@ -303,6 +307,8 @@ class DataLoader:
             self.read = 0
             self.readfailure = 0
             self.abortOnFailure = True
+            self.useUTCtime = self.dlg.cBUTC.isChecked()
+            self.noimport00 = self.dlg.cBReject00.isChecked()
             #TODO: Other file reading functions - eg. based on file name
             # TODO: Hourglass cursor while reading data.
             # Progressbar? QprogressBar
@@ -423,7 +429,7 @@ class DataLoader:
         return insdata
     
     
-    def readRSI(self,filename):
+    def readRSI(self,filename,useUTCtime = None):
         """
         Reads a csv file exported from RSI's radassist. The file has a three line header.
         It is assumed 1024ch spectra
@@ -443,7 +449,8 @@ class DataLoader:
         roiidxs = []
         timestampwarned = False
         self.readfailure = 0
-        useUTCtime = self.dlg.cBUTC.isChecked()
+        if useUTCtime is None:
+            useUTCtime = self.useUTCtime
         with open(self.filename, "r",encoding='latin-1') as f:
             for idx,line in enumerate(f):
                 data=(line.split(',')) 
@@ -570,15 +577,17 @@ class DataLoader:
         
         Exceptions here should be handled by the caller
         """
-        self.noimport00 = False
-        print(f"{lat},{lon}")
         # TODO: Set from UI
-        if self.noimport00 and lat == 0 and lon == 0:
+        lat = float(lat)
+        lon = float(lon)
+        
+        if self.noimport00 and lat == 0.0 and lon == 0.0:
             message = f"Problem when reading point, 0,0 latitude and longitude"
             level = Qgis.Warning
             self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+            print(message)
             return
-        print('OK')
+        
         if filename is None:
             filename = self.filename
         # Functions to use to convert the data before inserting
