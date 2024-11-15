@@ -280,7 +280,6 @@ class DataLoader:
         to the python console. Any data that have been read successfully befor the expection will stay stored.
         """
     
-        
         self.mission=self.dlg.leMission.text()
         self.vl=self.dlg.cbMapLayer.currentLayer()
         layer=self.iface.activeLayer()
@@ -299,11 +298,11 @@ class DataLoader:
         # or to call QGIS CRS selection dialog?
         toCRS= self.vl.crs()
         # The CRS of the vl is set to the same as the project when the vl is created
-        
         self.transformation = QgsCoordinateTransform(fromCRS, toCRS, QgsProject.instance())
         try:
-            self.read=0
-            self.readfailure=0
+            self.read = 0
+            self.readfailure = 0
+            self.abortOnFailure = True
             #TODO: Other file reading functions - eg. based on file name
             # TODO: Hourglass cursor while reading data.
             # Progressbar? QprogressBar
@@ -320,7 +319,7 @@ class DataLoader:
             self.iface.mapCanvas().refreshAllLayers()
             self.dlg.leMission.clear()
             self.dlg.FileWidget.setFilePath("")
-            if self.readfailure==0:
+            if self.readfailure == 0:
                 message=f"{self.read} points from file imported sucessfully to '{self.vl.name()}'"
                 level=Qgis.Success   
             else:
@@ -376,7 +375,8 @@ class DataLoader:
                 #print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
                 # print(f'{filename} OK')
-            except:
+            except Exception as e:
+                print(e)
                 print(f'No valid data found in {filename}!')
 
     def parsespefile(self, filename,directory):
@@ -482,10 +482,11 @@ class DataLoader:
                                 col+= 1
                         # Pressure and temperature may be stored as per detector data
                         if fields['Pres'] is None and 'PPT_PRES [mbar]' in data:
-                            fields['Pres'] = data.index('PPT_PRES [mbar]')
+                            pass
+                        #        fields['Pres'] = data.index('PPT_PRES [mbar]')
                         if fields['Temp'] is None and 'PPT_TEMP [°C]' in data:
                             fields['Temp'] = data.index('PPT_TEMP [°C]')
-                        print(f'fields:{fields}')
+                        # print(f'fields:{fields}')
                         lonfield = fields.pop('Long')
                         latfield = fields.pop('Lat')
                     # To go on with real data after the three lines of header
@@ -495,10 +496,11 @@ class DataLoader:
                 else:
                     lat = data[latfield]
                     lon = data[lonfield]
-                    if lat == 0 and lon == 0:
-                        # Assumes no gpsdata, bad luck if someone is collecting data at this point...
-                        self.readfailure+=1
-                        continue
+                    # THis functionallity is moved to insertpoint as it is needed for all file types
+                    # if lat == 0 and lon == 0:
+                    #    # Assumes no gpsdata, bad luck if someone is collecting data at this point...
+                    #    self.readfailure+=1
+                    #    continue
                     # Reading in one or two spectra
                     # The RSI file may contain more spectra, the are ignored for the time being
                     # TODO: Look into reading more spectra from RSI-file
@@ -542,25 +544,41 @@ class DataLoader:
                     insdata.append(vd1)
                     insdata.append(vd2)
                     insdata.append(timestamp)
+                    # TODO: Send the data to insertpoint as a dictionary
+                    # Write a wrapper to insertpoint that creates the list from the dict|
                     try:
                         self.insertpoint(lat,lon,insdata)
                     except Exception as e:
                         self.readfailure+=1
-                        print(e)
                         print(insdata)
+                        print(e)
                         # This will abort the import after the first failure.
                         # TODO: Make this user selectable
+                        # self.abortOnFailure is hardcoded to True in init
                         # TODO: Log errors to file
-                        return()
+                        if self.abortOnFailure:
+                            message = f"Error when importing {self.filename} - Aborting, rerun and see python console for details"
+                            level = Qgis.Critical
+                            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+                            return()
                 
     def insertpoint(self,lat,lon,insdata,filename = None):
         """
         Inserts a newly defined point into the selected layer. 
         
-        Filename may be set . Makes most sense for data types where each spectrum is in a separate file.
+        Filename  be set . Makes most sense for data types where each spectrum is in a separate file.
         
         Exceptions here should be handled by the caller
         """
+        self.noimport00 = False
+        print(f"{lat},{lon}")
+        # TODO: Set from UI
+        if self.noimport00 and lat == 0 and lon == 0:
+            message = f"Problem when reading point, 0,0 latitude and longitude"
+            level = Qgis.Warning
+            self.iface.messageBar().pushMessage("Data Loader", message, level=level)
+            return
+        print('OK')
         if filename is None:
             filename = self.filename
         # Functions to use to convert the data before inserting
@@ -581,6 +599,10 @@ class DataLoader:
             insdata[i] = converts[self.pr.fields()[i].typeName()](insdata[i])
             # Data are coming in as strings.
             # TODO: Make a custom exception so it is possible to fail out with more information
+        # Add fields for total counts in each detector:
+        insdata.append(self.calculatetotal(insdata[15]))
+        insdata.append(self.calculatetotal(insdata[16]))
+        
         feature = QgsFeature()
         point=QgsPointXY(float(lon),float(lat))
         # TODO: Could / should this be a 3d point?
@@ -595,6 +617,15 @@ class DataLoader:
         self.read+=1
 
 
+    def calculatetotal(self,spectre):
+        total = 0
+        if spectre is None:
+            return 0
+        chs = spectre.split(',')
+        for ch in chs:
+            total += int(ch)
+        return total
+            
     def createlayer(self):
         """
         Creates a new layer designed for storage of imported data
@@ -620,21 +651,23 @@ class DataLoader:
                     QgsField("utctime",  QVariant.String),
                     QgsField("laseraltitude", QVariant.Double),
                     QgsField("radaraltitude", QVariant.Double), 
-                    QgsField("pressure", QVariant.Double),
+                    QgsField("pressure", QVariant.Double), #5
                     QgsField("temperature", QVariant.Double),
                     QgsField("linenumber", QVariant.Int),
                     QgsField("utcdate", QVariant.String),
                     QgsField("detcount1",QVariant.Int),
-                    QgsField("livetime1",QVariant.Double),
+                    QgsField("livetime1",QVariant.Double), #10
                     QgsField("doserate1", QVariant.Double),
                     QgsField("detcount2",QVariant.Int),
                     QgsField("livetime2",QVariant.Double),
                     QgsField("doserate2", QVariant.Double),
-                    QgsField("spectre1", QVariant.String),
+                    QgsField("spectre1", QVariant.String), #15
                     QgsField("spectre2", QVariant.String),
                     QgsField("timestamp", QVariant.String),
                     QgsField("filename", QVariant.String),
-                    QgsField("mission", QVariant.String)
+                    QgsField("mission", QVariant.String),
+                    QgsField("totalcount1",QVariant.Int), #20
+                    QgsField("totalcount2",QVariant.Int),
                     ])
         # filename and mission should be kept as the two last fields 
         # as they will be added on later
