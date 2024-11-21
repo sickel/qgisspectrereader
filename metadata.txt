@@ -2,7 +2,7 @@
 name=Spectral data loader
 qgisMinimumVersion=3.0
 description=Loads spectral data
-version=1.15
+version=1.2
 author=Morten Sickel
 email=morten@sickel.net                    
 about=Loads spectral data into a layer. Possible to create a customised layer. To be used to import a set of geolocated spe files in a directory or csv-files exported from RSI radassist. The RSI csv files has a three line header and several fields that are to be collected for the spectre field, so it can not be imported using the normal csv-import function.
@@ -22,7 +22,8 @@ repository=https://github.com/sickel/qgisspectrereader
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=v1.15 Select to reject data with no GPS, i.e lat = 0 and lon = 0
+changelog=v1.20 Corrected bugs in spe reader
+    v1.15 Select to reject data with no GPS, i.e lat = 0 and lon = 0
     v1.11 Can select to convert epoch to UTC or computer time timestamps
     v1.1 .spe files can be read into the new data format
     v1.05 Better selection of fields from RSI file. New data format. .spe does not work for the moment. 
