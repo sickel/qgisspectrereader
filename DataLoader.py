@@ -372,12 +372,10 @@ class DataLoader:
         spefiles=list(filter(lambda x: x.endswith('.spe'), files))
         spefiles.sort()
         # print(spefiles)
-        readspec=False
-        readGPS=False
         
         for filename in spefiles:
             try:
-                insdata = self.parsespefile(filename,directory)
+                insdata,gpsdata = self.parsespefile(filename,directory)
                 #print(f"insdata;{insdata}")
                 self.insertpoint(float(gpsdata['Lat']),float(gpsdata['Lon']),insdata,directory+'/'+filename)
                 # print(f'{filename} OK')
@@ -386,8 +384,8 @@ class DataLoader:
                 print(f'No valid data found in {filename}!')
 
     def parsespefile(self, filename,directory):
-        spectre=[]
-        gpsdata=dict()
+        spectre = []
+        gpsdata = {}
         dose = 0
         temperature = 0
         encoding = self.checkencoding(directory+'/'+filename)
@@ -395,6 +393,8 @@ class DataLoader:
         if encoding is None:
             encoding = 'latin-1'
         # print(encoding)
+        readspec = False
+        readGPS = False
         with open(directory+'/'+filename, "r",encoding=encoding) as f:
             # print(f"reading {filename}")
             for line in f:
@@ -426,7 +426,7 @@ class DataLoader:
                 if line.startswith('$TEMPERATURE:'):
                     temperature=f.readline().strip()
         insdata=[float(gpsdata['Alt']), date, 2, 2, None, float(temperature), None, date, 1, None, dose, None, None, None, spectre, None, date]
-        return insdata
+        return insdata,gpsdata
     
     
     def readRSI(self,filename,useUTCtime = None):
@@ -593,7 +593,7 @@ class DataLoader:
         # Functions to use to convert the data before inserting
         # The keys are the variant typeNames in the table
         # TODO: Go back and check if things still works with postgres backend
-        converts = {'integer': int, 'double': float,'string':str}
+        converts = {'integer': int, 'double': float,'string':str}   
         # Putting in the last data:
         self.maxid+=1
         insdata.insert(0,self.maxid)    
@@ -602,10 +602,12 @@ class DataLoader:
         # Setting the right data type:
         insdata=[x if x !='' else None for x in insdata]
         for i in range(0,len(insdata)):
+            
             if insdata[i] is None:
                 continue
                 # Leave Nones as they are
             insdata[i] = converts[self.pr.fields()[i].typeName()](insdata[i])
+            self.insdata=insdata
             # Data are coming in as strings.
             # TODO: Make a custom exception so it is possible to fail out with more information
         # Add fields for total counts in each detector:
@@ -632,7 +634,7 @@ class DataLoader:
             return 0
         chs = spectre.split(',')
         for ch in chs:
-            total += int(ch)
+            total += float(ch)
         return total
             
     def createlayer(self):
@@ -675,8 +677,8 @@ class DataLoader:
                     QgsField("timestamp", QVariant.String),
                     QgsField("filename", QVariant.String),
                     QgsField("mission", QVariant.String),
-                    QgsField("totalcount1",QVariant.Int), #20
-                    QgsField("totalcount2",QVariant.Int),
+                    QgsField("totalcount1",QVariant.Double), #20
+                    QgsField("totalcount2",QVariant.Double),
                     ])
         # filename and mission should be kept as the two last fields 
         # as they will be added on later
