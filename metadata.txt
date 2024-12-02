@@ -2,7 +2,7 @@
 name=Spectral data loader
 qgisMinimumVersion=3.0
 description=Loads spectral data
-version=1.2
+version=1.20
 author=Morten Sickel
 email=morten@sickel.net                    
 about=Loads spectral data into a layer. Possible to create a customised layer. To be used to import a set of geolocated spe files in a directory or csv-files exported from RSI radassist. The RSI csv files has a three line header and several fields that are to be collected for the spectre field, so it can not be imported using the normal csv-import function.
