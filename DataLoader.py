@@ -442,6 +442,7 @@ class DataLoader:
         colnames = ['Lat', 'Long', 'Alt[m]', 'UtcTime', 'Laser_Alt [M]', 'RAD_ALT [M]', 'Pres', 'Temp', 'LineNum','UtcDate']
         # Detector specific data:
         perdetector = ['DetCount','LiveTime','Doserate'] # ,'PPT_PRES','PPT_TEMP']
+        
         #TODO: User selectable field mapping - will it still be needed?
         header = True
         fields = {}
@@ -470,6 +471,8 @@ class DataLoader:
                         # Roidata contains per detector information 
                         # such as livetime, detector count and dose rate
                         roiidxs = get_indexes("ROI for Virtual Detector",data)
+                        # Neutron data, this may or may not exist:
+                        neutronidxs = get_indexes("NTR VD", data)
                     if idx == 2:
                         # May need this later on, or maybe not?
                         header2 = data
@@ -547,10 +550,15 @@ class DataLoader:
                             insdata.append(None)
                         else:
                             insdata.append(data[fields[field]])
+                    neutroncount = None
+                    if len(neutronidxs) > 0:
+                        neutroncount = data[neutronidxs[0]]
+                        # TODO: Make this more flexible, now it is only the first neutron detector  
                     # Adds on the spectra       
                     insdata.append(vd1)
                     insdata.append(vd2)
                     insdata.append(timestamp)
+                    insdata.append(neutroncount)
                     # TODO: Send the data to insertpoint as a dictionary
                     # Write a wrapper to insertpoint that creates the list from the dict|
                     try:
