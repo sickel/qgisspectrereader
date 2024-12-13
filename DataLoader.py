@@ -472,6 +472,7 @@ class DataLoader:
                         # such as livetime, detector count and dose rate
                         roiidxs = get_indexes("ROI for Virtual Detector",data)
                         # Neutron data, this may or may not exist:
+                        # nrcan added this to find the indexes of the neutron fields
                         neutronidxs = get_indexes("NTR VD", data)
                     if idx == 2:
                         # May need this later on, or maybe not?
@@ -550,6 +551,7 @@ class DataLoader:
                             insdata.append(None)
                         else:
                             insdata.append(data[fields[field]])
+                    # nrcan: Added neutron count here
                     neutroncount = None
                     if len(neutronidxs) > 0:
                         neutroncount = data[neutronidxs[0]]
@@ -683,7 +685,7 @@ class DataLoader:
                     QgsField("spectre1", QVariant.String), #15
                     QgsField("spectre2", QVariant.String),
                     QgsField("timestamp", QVariant.String),
-                    QgsField("neutroncount", QVariant.Double),
+                    QgsField("neutroncount", QVariant.Double), # nrcan, added the field to the table here.
                     QgsField("filename", QVariant.String),
                     QgsField("mission", QVariant.String), # 20
                     QgsField("totalcount1",QVariant.Double), 
