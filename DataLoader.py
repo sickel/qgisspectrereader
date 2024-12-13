@@ -675,14 +675,14 @@ class DataLoader:
                     QgsField("spectre1", QVariant.String), #15
                     QgsField("spectre2", QVariant.String),
                     QgsField("timestamp", QVariant.String),
+                    QgsField("neutroncount", QVariant.Double),
                     QgsField("filename", QVariant.String),
-                    QgsField("mission", QVariant.String),
-                    QgsField("totalcount1",QVariant.Double), #20
+                    QgsField("mission", QVariant.String), # 20
+                    QgsField("totalcount1",QVariant.Double), 
                     QgsField("totalcount2",QVariant.Double),
                     ])
-        # filename and mission should be kept as the two last fields 
-        # as they will be added on later
-        # when the data is collected
+        # filename and mission and the totalcounts should be kept as the last fields 
+        # as they will be added on later when the data is collected
         # Commit changes - is this needed?
         vl.commitChanges()
         # To display the new layer in the project
