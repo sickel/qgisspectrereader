@@ -37,7 +37,7 @@ from qgis.core import Qgis
 
 from qgis.gui import QgsFileWidget
 
-from PyQt5.QtCore import *
+from qgis.PyQt.QtCore import *
 #from PyQt.QtGui import QFileDialog
 from qgis.core import QgsExpression
 from datetime import date,time,datetime
@@ -216,7 +216,7 @@ class DataLoader:
             self.dlg.pbLoadData.setEnabled(False)
         self.dlg.show()
         # Run the dialog event loop
-        result = self.dlg.exec_()
+        result = self.dlg.exec()
         # See if OK was pressed
         if result:
             # Do something useful here - delete the line containing pass and
