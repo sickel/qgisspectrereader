@@ -484,7 +484,6 @@ class DataLoader:
                         # such as livetime, detector count and dose rate
                         roiidxs = get_indexes("ROI for Virtual Detector", data)
                     if idx == 2:
-                        # May need this later on, or maybe not?
                         # 2nd line, some general data, some are repeated per VD
                         # Find columns for general data
                         for col in colnames:
